@@ -1,0 +1,29 @@
+# Local agent and operating-system state
+/.cogniflow-llm-router/
+/.codex/
+/.claude/
+/.agents/
+/.context/
+/GOAL.md
+/WORKFLOW.md
+.DS_Store
+
+# Local credentials and private key material
+.env
+.env.*
+!.env.example
+*.key
+*.pem
+*.p12
+*.pfx
+/credentials/
+/secrets/
+/vault-data/
+
+# Dependencies and generated output
+node_modules/
+dist/
+build/
+coverage/
+.cache/
+*.log
