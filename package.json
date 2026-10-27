@@ -1,0 +1,40 @@
+{
+  "name": "keyroot",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "engines": {
+    "node": ">=24.18.0 <25",
+    "npm": ">=11"
+  },
+  "workspaces": [
+    "apps/*",
+    "packages/*"
+  ],
+  "scripts": {
+    "keyroot": "node scripts/keyroot.mjs",
+    "dev": "node scripts/dev.mjs",
+    "build": "tsc -p apps/controller/tsconfig.build.json && npm run build --workspace @keyroot/review && npm run build:phone --workspace @keyroot/review",
+    "typecheck": "tsc --noEmit && tsc -p apps/review/tsconfig.json",
+    "lint": "eslint .",
+    "test": "node scripts/run-tests.mjs unit",
+    "test:integration": "node scripts/run-tests.mjs integration",
+    "test:browser": "node scripts/run-tests.mjs browser",
+    "test:sites": "npm run test:sites --workspace @keyroot/review",
+    "verify:contracts": "node scripts/verify-contracts.mjs",
+    "verify:secrets": "node scripts/verify-secrets.mjs"
+  },
+  "devDependencies": {
+    "@eslint/js": "9.39.4",
+    "@types/node": "24.19.2",
+    "@types/react": "19.3.0",
+    "@types/react-dom": "19.3.0",
+    "eslint": "9.39.4",
+    "tsx": "4.23.15",
+    "typescript": "5.9.3",
+    "typescript-eslint": "8.46.2"
+  },
+  "overrides": {
+    "rollup": "4.65.1"
+  }
+}

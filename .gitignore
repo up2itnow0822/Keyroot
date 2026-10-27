@@ -27,3 +27,11 @@ build/
 coverage/
 .cache/
 *.log
+
+# Private source history and local runtime state
+/docs/research/*
+!/docs/research/AGENTS.md
+/runtime/
+*.sqlite
+*.sqlite-shm
+*.sqlite-wal

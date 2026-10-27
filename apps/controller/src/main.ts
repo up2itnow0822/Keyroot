@@ -1,0 +1,10 @@
+import { startController } from './server.js';
+import { defaultDirectory } from './cli.js';
+export const protocolVersion = 1 as const;
+const port = Number(process.env.KEYROOT_PORT ?? 9047);
+if (!Number.isSafeInteger(port) || port < 0 || port > 65535) throw new Error('Invalid loopback port');
+const mode = process.env.KEYROOT_MODE ?? 'demo';
+if (mode !== 'demo' && mode !== 'real') throw new Error('Invalid controller mode');
+const controller = await startController({ directory: process.env.KEYROOT_DIRECTORY ?? defaultDirectory(mode), port, mode, ...(process.env.KEYROOT_PHONE_ORIGIN ? { phoneOrigin: process.env.KEYROOT_PHONE_ORIGIN } : {}), ...(process.env.KEYROOT_OWNER_ORIGIN ? { ownerOrigin: process.env.KEYROOT_OWNER_ORIGIN } : {}) });
+process.stdout.write(`Keyroot ${mode} controller listening at ${controller.origin}\n`);
+for (const signal of ['SIGINT', 'SIGTERM'] as const) process.on(signal, () => { void controller.close().then(() => process.exit(0)); });

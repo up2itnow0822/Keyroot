@@ -1,0 +1,15 @@
+{
+  "name": "@keyroot/core",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts",
+    "./*": "./src/*.ts"
+  },
+  "dependencies": {
+    "@simplewebauthn/server": "14.0.3",
+    "age-encryption": "0.3.1",
+    "libsodium-wrappers": "0.8.4"
+  }
+}
