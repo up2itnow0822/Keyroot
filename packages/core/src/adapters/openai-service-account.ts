@@ -1,13 +1,14 @@
+import { isAccountAssessmentEvaluator, type AccountAssessmentEvaluator } from './account-assessment.js';
+import type { CapabilityAction } from '../admission.js';
 import { validStoreBinding } from './store.js';
 import type { ExistingStore, StoreBinding } from './store.js';
 
 type Fetch = typeof globalThis.fetch;
 export type RevocationObservation = 'confirmed-revoked' | 'confirmed-active' | 'unverified';
-type ProbeOutcome = 'accepted' | 'rejected' | 'confounded' | 'unknown';
+export type ProbeOutcome = 'accepted' | 'rejected' | 'confounded' | 'unknown';
 type SafeKey = { id: string; name: string; serviceAccountId: string };
 type Result<T> = { status: 'ok'; value: T } | { status: 'unknown' | 'denied' | 'schema-error' };
-interface Config { kind: 'synthetic' | 'live'; accountId: string; projectId: string; serviceAccountId: string; adminToken: string; fetch: Fetch; store: ExistingStore; timeoutMs?: number }
-export interface LiveAssessmentHook { assess(scope: { accountId: string; projectId: string; serviceAccountId: string; action: 'create' | 'list' | 'revoke' | 'probe' }): Promise<{ admitted: boolean; limitations: readonly string[] }> }
+export interface OpenAIServiceAccountConfig { kind: 'synthetic' | 'live'; accountId: string; projectId: string; serviceAccountId: string; adminToken: string; fetch: Fetch; store: ExistingStore; timeoutMs?: number; assessment?: AccountAssessmentEvaluator; adapterVersion?: string; authorityFingerprint?: string; configurationHash?: string }
 const idPattern = /^[A-Za-z0-9_-]{1,128}$/;
 function validId(value: unknown): value is string { return typeof value === 'string' && idPattern.test(value); }
 function object(value: unknown): Record<string, unknown> | undefined { return value !== null && typeof value === 'object' && !Array.isArray(value) ? value as Record<string, unknown> : undefined; }
@@ -16,9 +17,16 @@ function key(value: unknown, owner: string): SafeKey | undefined {
   if (o?.object !== 'organization.project.api_key' || !validId(o.id) || typeof o.name !== 'string' || ownership?.type !== 'service_account' || account?.id !== owner) return undefined;
   return { id: o.id, name: o.name, serviceAccountId: owner };
 }
-export function createOpenAIServiceAccountAdapter(config: Config) {
+export function createOpenAIServiceAccountAdapter(inputConfig: OpenAIServiceAccountConfig) {
+  const config = Object.freeze({ ...inputConfig });
   if (![config.accountId, config.projectId, config.serviceAccountId].every(validId)) throw new Error('Invalid account scope');
-  if (config.kind !== 'synthetic' || config.fetch === globalThis.fetch) throw new Error('Live account admission is unavailable');
+  if (config.kind === 'synthetic' && config.fetch === globalThis.fetch) throw new Error('Synthetic transport must be isolated');
+  if (config.kind === 'live' && (!isAccountAssessmentEvaluator(config.assessment) || config.assessment.trustDomain !== 'live' || !config.adapterVersion || !config.authorityFingerprint || !config.configurationHash)) throw new Error('Live account admission is unavailable');
+  function admit(action: CapabilityAction): void {
+    if (config.kind !== 'live') return;
+    const assessment = config.assessment!.evaluate({ accountId: config.accountId, resourceId: `${config.projectId}:${config.serviceAccountId}`, action, adapter: 'openai-service-account', adapterVersion: config.adapterVersion!, authorityFingerprint: config.authorityFingerprint!, configurationHash: config.configurationHash! }, 'live');
+    if (!assessment.admitted) throw new Error('Scoped live account evidence missing or invalid');
+  }
   const root = `https://api.openai.com/v1/organization/projects/${encodeURIComponent(config.projectId)}`;
   const attempted = new Set<string>();
   const timeoutMs = config.timeoutMs ?? 10_000;
@@ -39,6 +47,7 @@ export function createOpenAIServiceAccountAdapter(config: Config) {
   }
   function failure(status: number | undefined): 'unknown' | 'denied' { return status === 401 || status === 403 ? 'denied' : 'unknown'; }
   async function list(): Promise<Result<SafeKey[]>> {
+    admit('observe');
     const values: SafeKey[] = []; let after: string | undefined; const cursors = new Set<string>(); let more = true;
     do {
       const params = new URLSearchParams({ limit: '100', owner_project_access: 'any' }); if (after) params.set('after', after);
@@ -62,9 +71,14 @@ export function createOpenAIServiceAccountAdapter(config: Config) {
     return { status: 'ok', value: values };
   }
   return {
-    capabilities: Object.freeze({ trust: 'synthetic' as const, liveAdmitted: false, arbitraryProjectKeyCreate: false, limitations: ['Account permissions, overlap and data-plane probes require live assessment', 'Correlation names are not idempotency keys'] }),
-    async create(input: { operationId: string; scopes: string[]; expiresInSeconds: number }) {
+    capabilities: Object.freeze({ trust: config.kind === 'live' ? 'live' as const : 'synthetic' as const, get liveAdmitted() { if (config.kind !== 'live') return false; try { for (const action of ['create', 'observe', 'validate', 'revoke'] as const) admit(action); return true; } catch { return false; } }, arbitraryProjectKeyCreate: false, limitations: ['Account permissions, overlap and data-plane probes require live assessment', 'Correlation names are not idempotency keys'] }),
+    async create(input: { operationId: string; scopes: string[]; expiresInSeconds: number; storeTarget?: { handleId: string; expectedVersion: number }; beforeStore?: () => Promise<unknown>; signal?: AbortSignal }) {
       if (!validId(input.operationId) || !Array.isArray(input.scopes) || input.scopes.some((s) => typeof s !== 'string' || !s.trim()) || !Number.isSafeInteger(input.expiresInSeconds) || input.expiresInSeconds <= 0) throw new Error('Invalid create request');
+      admit('create');
+      if (config.kind === 'live' && !input.beforeStore) throw new Error('Fresh store authority required');
+      const expectedVersion = input.storeTarget?.expectedVersion ?? 0;
+      if ((input.storeTarget && input.storeTarget.handleId !== `operations/${input.operationId}`) || !Number.isSafeInteger(expectedVersion) || expectedVersion !== 0) throw new Error('Exact operation store target required');
+      if (input.signal?.aborted) throw new Error('Create aborted before dispatch');
       if (attempted.has(input.operationId)) return { status: 'reconciliation-required' as const };
       attempted.add(input.operationId);
       const name = `keyroot-${input.operationId}`; const handle = `operations/${input.operationId}`;
@@ -73,18 +87,22 @@ export function createOpenAIServiceAccountAdapter(config: Config) {
       const body = object(response.body);
       if (body?.object !== 'organization.project.service_account.api_key' || !validId(body.id) || body.name !== name || typeof body.value !== 'string' || !body.value) return { status: 'unknown' as const };
       const binding: StoreBinding = { operationId: input.operationId, issuerId: body.id, accountId: config.accountId, projectId: config.projectId, serviceAccountId: config.serviceAccountId };
-      let saved; try { saved = await config.store.write(handle, 0, body.value, binding); } catch { return { status: 'store-outcome-unknown' as const, issuerId: body.id, handle }; }
+      try { await input.beforeStore?.(); if (input.signal?.aborted) throw new Error('Store continuation aborted'); } catch { return { status: 'created-unrecoverable' as const, issuerId: body.id, handle }; }
+      let saved; try { saved = await config.store.write(handle, expectedVersion, body.value, binding); } catch { return { status: 'store-outcome-unknown' as const, issuerId: body.id, handle }; }
       if (saved.status === 'unknown' || saved.status === 'schema-error') return { status: 'store-outcome-unknown' as const, issuerId: body.id, handle };
       if (saved.status !== 'written') return { status: 'created-unrecoverable' as const, issuerId: body.id, handle };
       return { status: 'created' as const, issuerId: body.id, handle, version: saved.version };
     },
     list,
-    async reconcile(operationId: string) {
+    async reconcile(operationId: string, pinnedTarget?: { issuerId?: string; expectedVersion: number }) {
       if (!validId(operationId)) throw new Error('Invalid operation');
       const found = await list(); if (found.status !== 'ok') return { status: 'unknown' as const };
       const matches = found.value.filter((item) => item.name === `keyroot-${operationId}`);
       if (matches.length !== 1) return { status: 'ambiguous' as const, matches: matches.length };
       const item = matches[0]; if (!item) return { status: 'unknown' as const };
+      if (pinnedTarget?.issuerId && item.id !== pinnedTarget.issuerId) return { status: 'ambiguous' as const, matches: 1 };
+      const expectedVersion = pinnedTarget?.expectedVersion ?? 0;
+      if (expectedVersion !== 0) return { status: 'unknown' as const };
       const handle = `operations/${operationId}`;
       let current; let pinned;
       try { current = await config.store.metadata(handle); } catch { return { status: 'unknown' as const }; }
@@ -97,9 +115,13 @@ export function createOpenAIServiceAccountAdapter(config: Config) {
       if ((Object.keys(expected) as (keyof StoreBinding)[]).some((k) => pinned.binding?.[k] !== expected[k])) return { status: 'ambiguous' as const, matches: 1 };
       return { status: 'stored-candidate' as const, issuerId: item.id, version: 1 };
     },
-    async revoke(issuerId: string) {
+    async revoke(issuerId: string, beforeRevoke?: () => Promise<unknown>) {
       if (!validId(issuerId)) throw new Error('Invalid issuer id');
+      admit('revoke');
       const found = await list(); if (found.status !== 'ok' || !found.value.some((item) => item.id === issuerId)) return { status: 'unverified' as const };
+      if (config.kind === 'live' && !beforeRevoke) throw new Error('Fresh revoke authority required');
+      await beforeRevoke?.();
+      admit('revoke');
       const response = await request(`/api_keys/${encodeURIComponent(issuerId)}`, { method: 'DELETE' });
       if (!response || response.status < 200 || response.status >= 300) return { status: 'unverified' as const };
       const body = object(response.body);
@@ -107,12 +129,14 @@ export function createOpenAIServiceAccountAdapter(config: Config) {
     },
     async observe(issuerId: string) {
       if (!validId(issuerId)) throw new Error('Invalid issuer id');
+      admit('observe');
       const response = await request(`/api_keys/${encodeURIComponent(issuerId)}`, { method: 'GET' });
       if (!response || response.status < 200 || response.status >= 300) return { status: 'unverified' as const };
       const found = key(response.body, config.serviceAccountId);
       return found?.id === issuerId ? { status: 'confirmed-active' as const } : { status: 'unverified' as const };
     },
-    async probe(port: { withValue: (execute: (value: string) => Promise<void>) => Promise<{ status: string }> }, callback: (value: string) => Promise<ProbeOutcome>) {
+    async probe(port: { withValue: (execute: (value: string) => Promise<void>) => Promise<{ status: string }> }, callback: (value: string) => Promise<ProbeOutcome>): Promise<{ status: ProbeOutcome }> {
+      admit('validate');
       let outcome: ProbeOutcome = 'unknown';
       try { const resolved = await port.withValue(async (value) => { outcome = await callback(value); }); if (resolved.status !== 'resolved') return { status: 'unknown' as const }; } catch { return { status: 'unknown' as const }; }
       return { status: (['accepted', 'rejected', 'confounded', 'unknown'] as readonly string[]).includes(outcome) ? outcome : 'unknown' as const };

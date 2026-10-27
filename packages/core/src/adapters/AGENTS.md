@@ -10,7 +10,9 @@
 - One-time values go directly to the existing store; public results and errors contain metadata only.
 - Consumer ports expose only explicitly mapped handles and pinned versions, without administration methods.
 - Reconciliation compares operation/issuer/account bindings; existence or timeout proves no successful rotation.
-- Current issuer mode is synthetic only; actual account admission remains a separate integration.
+- Live issuer construction requires a registered scoped account evaluator; real controller dispatch additionally requires its live admission guard. Missing evidence denies by default.
+- Account verifier callbacks are trusted constructor ports. Hermetic callback tests demonstrate the boundary and do not establish actual owner permissions.
+- Strict descriptor hashes bind scope/expiry/probe/store targets and exact action parameters. Creation rechecks authority immediately before CAS.
 
 ## Work Guidance
 - Validate response shape and scope, bound waits and keep unknown outcomes explicit.

@@ -1,7 +1,7 @@
 import type { DatabaseSync } from 'node:sqlite';
 import { createHash, createPublicKey, verify, randomUUID, type JsonWebKey as NodeJsonWebKey } from 'node:crypto';
 import { Journal, type AuthorizedIntent, type OperationRecord } from './journal.js';
-import { actionCost, canonicalJSON, manifestDigest, parseCanonicalManifest, snapshotDigest, type ApprovalManifest, type ManifestOperation, type ManifestAction, type SignerRole } from './manifest.js';
+import { actionCost, canonicalJSON, deepFreeze, manifestDigest, parseCanonicalManifest, snapshotDigest, type ApprovalManifest, type ManifestOperation, type ManifestAction, type SignerRole } from './manifest.js';
 const localBootstraps = new WeakSet<object>();
 export interface LocalBootstrapContext {
     readonly kind: 'local-console-bootstrap';
@@ -50,11 +50,22 @@ export interface ApproverBootstrap {
     localBootstrap: LocalBootstrapContext;
     confirmedFingerprint: string;
 }
+export interface RealAdmissionContext {
+    installationId: string;
+    bootId: string;
+    phase: 'dispatch' | 'continuation';
+    now: number;
+    snapshotDigest: string;
+    operation: Readonly<ManifestOperation>;
+    action: Readonly<ManifestAction>;
+}
 export class ApprovalService {
     constructor(readonly journal: Journal, private readonly options: {
         mode: 'synthetic' | 'real';
         clock?: () => number;
         checkEffectFence?: () => Promise<void>;
+        /** Installed by the trusted owning workflow, never selected or constructed from HTTP JSON. */
+        assertRealAdmission?: (context: Readonly<RealAdmissionContext>) => Promise<void>;
     }) {
     }
     bootstrapApprover(input: ApproverBootstrap): void {
@@ -162,9 +173,8 @@ export class ApprovalService {
     private async checkReservedIntentAuthority(request: AuthorizeEffectRequest & {
         intentId: string;
     }, compoundCreate: boolean): Promise<AuthorizedIntent> {
-        if (this.options.mode === 'real')
-            throw new Error('Real mutation remains gated pending custody, isolation and recovery admission');
         await this.options.checkEffectFence?.();
+        await this.assertRealAdmission(request, 'continuation');
         return this.journal.transaction(db => {
             this.journal.assertCurrent(db);
             const now = this.options.clock?.() ?? Date.now();
@@ -214,6 +224,25 @@ export class ApprovalService {
             return this.journal.intentRecord(row);
         });
     }
+    private async assertRealAdmission(request: AuthorizeEffectRequest, phase: RealAdmissionContext['phase']): Promise<void> {
+        if (this.options.mode !== 'real') return;
+        if (!this.options.assertRealAdmission) throw new Error('Real mutation remains gated pending custody, isolation and recovery admission');
+        const context = this.journal.read(db => {
+            this.journal.assertCurrent(db);
+            const grant = db.prepare('SELECT raw_manifest FROM approval_grant WHERE grant_id=? AND cancelled=0').get(request.grantId);
+            if (!grant) throw new Error('Cancelled or unknown approval');
+            const manifest = parseCanonicalManifest(String(grant.raw_manifest));
+            const now = this.options.clock?.() ?? Date.now();
+            this.checkManifest(manifest, now);
+            if (snapshotDigest(manifest) !== request.currentSnapshotDigest) throw new Error('Current scope or policy changed');
+            const operation = manifest.operations.find(op => op.operationId === request.operationId);
+            const action = operation?.actions.find(a => a.id === request.actionId);
+            if (!operation || !action) throw new Error('Action outside signed finite scope');
+            return deepFreeze({ installationId: this.journal.installationId, bootId: this.journal.bootId, phase, now, snapshotDigest: request.currentSnapshotDigest, operation, action });
+        });
+        const result = await this.options.assertRealAdmission(context);
+        if (result !== undefined) throw new Error('Trusted real admission assertion returned an invalid result');
+    }
     cancelGrant(grantId: string): void {
         this.journal.transaction(db => {
             db.prepare('UPDATE approval_grant SET cancelled=1 WHERE grant_id=?').run(grantId);
@@ -221,10 +250,8 @@ export class ApprovalService {
         });
     }
     async authorizeEffect(request: AuthorizeEffectRequest): Promise<AuthorizedIntent> {
-        // This unit does not yet have the required independent-origin/custody/recovery admission path.
-        if (this.options.mode === 'real')
-            throw new Error('Real mutation remains gated pending custody, isolation and recovery admission');
         await this.options.checkEffectFence?.();
+        await this.assertRealAdmission(request, 'dispatch');
         return this.journal.transaction(db => {
             this.journal.assertCurrent(db);
             const now = this.options.clock?.() ?? Date.now();

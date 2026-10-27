@@ -18,6 +18,8 @@ export interface ActionParameters {
     adapterId?: string;
     authorityFingerprint?: string;
     reasonCode?: string;
+    /** SHA-256 of the content-addressed, secret-free executor configuration descriptor. */
+    configurationHash?: string;
 }
 export interface ManifestAction {
     id: string;
@@ -151,9 +153,12 @@ export function validateManifest(value: unknown): asserts value is ApprovalManif
             object(a, ['id', 'kind', 'parameters', 'budgetCost']);
             id(a.id);
             choice(a.kind, actionKinds);
-            object(a.parameters, [], ['resourceId', 'consumerId', 'destinationId', 'handleId', 'generation', 'expectedRevision', 'recipeId', 'adapterId', 'authorityFingerprint', 'reasonCode']);
+            object(a.parameters, [], ['resourceId', 'consumerId', 'destinationId', 'handleId', 'generation', 'expectedRevision', 'recipeId', 'adapterId', 'authorityFingerprint', 'reasonCode', 'configurationHash']);
             for (const [k, v] of Object.entries(a.parameters)) {
-                if (k === 'generation')
+                if (k === 'configurationHash') {
+                    if (typeof v !== 'string' || !/^sha256:[a-f0-9]{64}$/.test(v)) throw new Error('Invalid configuration hash');
+                }
+                else if (k === 'generation')
                     integer(v);
                 else
                     id(v);

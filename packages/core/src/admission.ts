@@ -1,6 +1,6 @@
 export type CapabilityAction = 'create' | 'validate' | 'deliver' | 'observe' | 'revoke';
 export type TrustDomain = 'synthetic' | 'live';
-export interface AdmissionScope { accountId: string; resourceId: string; action: CapabilityAction; adapter: string; adapterVersion: string; authorityFingerprint: string; }
+export interface AdmissionScope { accountId: string; resourceId: string; action: CapabilityAction; adapter: string; adapterVersion: string; authorityFingerprint: string; configurationHash?: string; }
 export interface AdmissionEvidence { observer: string; method: string; evidenceHash: string; observedAt: string; expiresAt: string; limitations: string[]; invalidationTriggers: string[]; }
 export interface AdmissionRecord { scope: AdmissionScope; evidence: AdmissionEvidence; trustDomain: TrustDomain; }
 export interface AdmissionAssessment { admitted: boolean; reason: string; }
@@ -22,10 +22,23 @@ export function assessAdmission(record: unknown, expected: AdmissionScope, now: 
   if (typeof record !== 'object' || record === null || !issued.has(record)) return { admitted: false, reason: 'untrusted provenance' };
   const candidate = record as AdmissionRecord;
   if (candidate.trustDomain !== domain) return { admitted: false, reason: 'trust domain mismatch' };
-  const keys: (keyof AdmissionScope)[] = ['accountId', 'resourceId', 'action', 'adapter', 'adapterVersion', 'authorityFingerprint'];
+  const keys: (keyof AdmissionScope)[] = ['accountId', 'resourceId', 'action', 'adapter', 'adapterVersion', 'authorityFingerprint', 'configurationHash'];
   if (keys.some((key) => candidate.scope[key] !== expected[key])) return { admitted: false, reason: 'scope mismatch' };
   const time = Date.parse(now);
   if (!Number.isFinite(time) || time < Date.parse(candidate.evidence.observedAt) || time >= Date.parse(candidate.evidence.expiresAt)) return { admitted: false, reason: 'evidence outside validity period' };
   if (invalidations.some((event) => candidate.evidence.invalidationTriggers.includes(event))) return { admitted: false, reason: 'evidence invalidated' };
   return { admitted: true, reason: 'scoped evidence accepted' };
+}
+
+/** Constructor-only trusted verifier port. Install an actual account-specific verifier in the owning workflow. */
+export interface BoundedAdmissionVerifier {
+  (request: Readonly<{ challenge: string; scope: Readonly<AdmissionScope>; signal: AbortSignal }>): Promise<{
+    challenge: string;
+    scope: AdmissionScope;
+    outcome: 'verified' | 'denied' | 'unverified';
+    /** Safe observations only; never provider bodies, values, tokens or arbitrary prose. */
+    evidence: Readonly<Record<string, string | number | boolean>>;
+    limitations: readonly string[];
+    invalidationTriggers: readonly string[];
+  }>;
 }
