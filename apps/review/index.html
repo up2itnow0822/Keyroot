@@ -3,6 +3,17 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="theme-color" content="#fcfbf7" />
+    <script>
+      (() => {
+        let choice = null;
+        try { choice = localStorage.getItem('keyroot.theme'); } catch {}
+        const theme = choice === 'light' || choice === 'dark'
+          ? choice : (matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light');
+        document.documentElement.dataset.theme = theme;
+        document.documentElement.style.colorScheme = theme;
+      })();
+    </script>
     <title>Keyroot · Review</title>
   </head>
   <body>

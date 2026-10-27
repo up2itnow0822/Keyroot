@@ -6,6 +6,10 @@
 - Keep phone approval source/build separate from the review build. Local phone preview is demo-only.
 - Never import controller administration material or real secret values.
 - Parent application guidance: `../AGENTS.md`. No child DOX documents yet.
+- `src/components/` owns pure display contracts. `App.tsx` currently renders a labeled synthetic preview; controller integration is a separate pending slice.
+- Appearance state is independent of review state. Dialog closure returns focus to the connected opener or visible details action.
+- `npm run test:browser` from the repository root covers component/theme contracts; actual CUA journeys and visual comparison are recorded in root `design-qa.md`.
+- Frontend TypeScript uses bundler resolution in `tsconfig.json`; controller and core retain Node ESM resolution. The root typecheck command covers both.
 
 Run the local server yourself and open the preview in the browser available to this environment. Do not give the user server-start instructions when you can run it.
 

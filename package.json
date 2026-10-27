@@ -14,7 +14,7 @@
   "scripts": {
     "dev": "node scripts/dev.mjs",
     "build": "tsc -p apps/controller/tsconfig.build.json && npm run build --workspace @keyroot/review && npm run build:phone --workspace @keyroot/review",
-    "typecheck": "tsc --noEmit",
+    "typecheck": "tsc --noEmit && tsc -p apps/review/tsconfig.json",
     "lint": "eslint .",
     "test": "node scripts/run-tests.mjs unit",
     "test:integration": "node scripts/run-tests.mjs integration",

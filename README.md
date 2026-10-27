@@ -6,7 +6,16 @@ Keyroot is a personal credential lifecycle project for four machines and connect
 
 ## Current status
 
-Project bootstrap. Application implementation will start with the foundation required for Phase 2 credential rotation.
+Phase 2 is under active construction. The local workspace includes inventory and capability contracts, a selected light/dark review preview, and a controller foundation. Full lifecycle integration and live validation remain incomplete.
+
+With Node 24.18+ (24.x) and npm 11+, run:
+
+```sh
+npm ci
+npm run dev
+```
+
+Open `http://127.0.0.1:4173/`. The screen is a labeled synthetic preview; it cannot approve or rotate real credentials. Theme changes preserve the current review draft.
 
 ## Planned behavior
 

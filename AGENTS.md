@@ -37,4 +37,5 @@
 - `apps/AGENTS.md` — owns controller, review and approval application boundaries.
 - `packages/AGENTS.md` — owns shared lifecycle domain and synthetic fixtures.
 - `scripts/AGENTS.md` — owns local orchestration and verification commands.
+- `tests/AGENTS.md` — owns synthetic integration and browser-component contracts.
 - Root retains ownership of product-wide instructions, top-level workflow records, and tool-managed router housekeeping.
