@@ -26,3 +26,11 @@ test('mapped values cannot become loader configuration or administration environ
     assert.equal(resolved, false);
   }
 });
+
+test('abort after store callback but before resolution refuses delivery and cleans startup', async () => {
+  const controller = new AbortController(); const x = setup({ issuerExpiresAt: Date.now() + 60000 });
+  let accidentallyReturned: Awaited<ReturnType<typeof launchManagedWorkload>> | undefined;
+  try {
+    await assert.rejects(async () => { accidentallyReturned = await launchManagedWorkload({ ...x, context: { ...x.context, signal: controller.signal }, store: { async withValue(_h, _v, use) { await use('synthetic-secret'); controller.abort(); return { status: 'resolved' }; } }, trust: { beforeEffect: async () => {}, quarantine: async () => 'clear' }, heartbeat: { assertHealthy: async () => {} } }); }, /Managed workload refused/);
+  } finally { await accidentallyReturned?.stop(); }
+});

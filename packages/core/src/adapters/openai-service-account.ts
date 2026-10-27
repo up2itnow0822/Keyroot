@@ -37,7 +37,7 @@ export function createOpenAIServiceAccountAdapter(inputConfig: OpenAIServiceAcco
     try {
       return await Promise.race([
         (async () => {
-          const response = await config.fetch(`${root}${path}`, { ...init, signal: controller.signal, headers: { Authorization: `Bearer ${config.adminToken}`, 'Content-Type': 'application/json' } });
+          const response = await config.fetch(`${root}${path}`, { ...init, redirect: 'error', signal: controller.signal, headers: { Authorization: `Bearer ${config.adminToken}`, 'Content-Type': 'application/json' } });
           let body: unknown; try { body = await response.json(); } catch { body = undefined; }
           return { status: response.status, body };
         })(),

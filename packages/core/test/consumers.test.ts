@@ -93,3 +93,12 @@ test('consumer identity, timestamp, method and signature must all verify indepen
     assert.throws(() => verifyConsumerUse({ observation: fake, signature: sig }, subject, config));
   }
 });
+
+test('quarantine activated while the authority fence waits prevents destination push', async () => {
+  const d = { ...base, driver: 'vercel' as const, projectId: 'project', teamId: 'team', environment: 'production' as const, variable: 'API_KEY', accountId: 'account', pushTokenFingerprint: credentialFingerprint('synthetic-push') };
+  let release!: () => void; let entered!: () => void; let quarantined = false; let pushes = 0;
+  const fence = new Promise<void>(resolve => { release = resolve; }); const reached = new Promise<void>(resolve => { entered = resolve; });
+  const consumer = createVercelConsumer({ descriptor: d, pushToken: 'synthetic-push', admission: { assertAdmitted: async () => {} }, store: { async withValue(_h, _v, use) { await use('synthetic-secret'); return { status: 'resolved' }; } }, trust: { quarantine: async () => quarantined ? 'quarantined' : 'clear', beforeEffect: async () => { entered(); await fence; } }, transport: async (_url, request) => { if (request?.method === 'POST') { pushes++; return new Response(JSON.stringify({ id: 'env_fixture', key: 'API_KEY', type: 'encrypted', target: ['production'] })); } return new Response(JSON.stringify({ id: 'project', accountId: 'team' })); } });
+  const pending = consumer.deliver(intent(d), context); await reached; quarantined = true; release(); const result = await pending;
+  assert.equal(pushes, 0); assert.equal(result.outcome, 'rejected');
+});

@@ -16,6 +16,7 @@
 
 ## Work Guidance
 - Validate response shape and scope, bound waits and keep unknown outcomes explicit.
+- Reject HTTP redirects; tokens and request bodies cannot follow an unapproved endpoint.
 
 ## Verification
 - Adapter tests are included in `npm test`.

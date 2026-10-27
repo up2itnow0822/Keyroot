@@ -1,6 +1,25 @@
 import { test } from 'node:test';
 import { strict as assert } from 'node:assert';
 import { createOpenBaoStore } from '../src/adapters/openbao-kv2.js';
+import { createServer, type Server } from 'node:http';
+
+test('store redirects cannot send the store token or write body to another endpoint', async t => {
+  let forwarded = 0;
+  const receiver = createServer((_req, res) => { forwarded++; res.writeHead(200, { 'Content-Type': 'application/json' }).end(JSON.stringify({ data: { version: 1 } })); });
+  async function listen(server: Server): Promise<string> {
+    await new Promise<void>(resolve => server.listen(0, '127.0.0.1', resolve));
+    const address = server.address();
+    assert.ok(address && typeof address !== 'string');
+    return `http://127.0.0.1:${address.port}`;
+  }
+  const other = await listen(receiver);
+  const issuer = createServer((_req, res) => { res.writeHead(307, { Location: `${other}/capture` }).end(); });
+  const baseUrl = await listen(issuer);
+  t.after(() => { receiver.closeAllConnections(); issuer.closeAllConnections(); receiver.close(); issuer.close(); });
+  const store = createOpenBaoStore({ baseUrl, mount: 'secret', token: 'SYNTHETIC_REDIRECT_TOKEN', syntheticLoopback: true, fetch });
+  assert.deepEqual(await store.write('ops/redirect', 0, 'SYNTHETIC_REDIRECT_VALUE'), { status: 'unknown' });
+  assert.equal(forwarded, 0);
+});
 
 test('CAS uses KV2 wire format and exposes a narrow consumer port', async () => {
   const calls: { url: string; init?: RequestInit }[] = [];

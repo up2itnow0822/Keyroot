@@ -1,6 +1,8 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { spawn } from 'node:child_process';
+import childProcess, { spawn, type ChildProcess, type SpawnOptions } from 'node:child_process';
+import { syncBuiltinESMExports } from 'node:module';
+import type { Readable, Writable } from 'node:stream';
 import { createCipheriv, createDecipheriv, generateKeyPairSync, randomBytes, sign } from 'node:crypto';
 import { mkdtemp, readFile, realpath, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
@@ -73,3 +75,64 @@ test('closed launcher FD and supervisor SIGHUP/SIGQUIT/TERM clean managed groups
   const root = await mkdtemp(join(tmpdir(), 'keyroot-signal-cleanup-'));
   try { for (const signal of ['fd-close', 'SIGHUP', 'SIGQUIT', 'SIGTERM'] as const) { const d = wrapper(join(root, signal), Date.now() + 60000); const authority = signedAuthority(d); let child: number | undefined; let supervisor: number | undefined; try { const m = await launchManagedWorkload({ descriptor: d, intent: await authority.authorize(), context, store: { async withValue(_h, _v, use) { await use('synthetic-secret'); return { status: 'resolved' }; } }, trust: authority.trust, heartbeat: { assertHealthy: async () => {} } }); child = m.childPid; supervisor = m.supervisorPid; const tree = await pids(join(root, signal)); if (signal === 'fd-close') m.releaseLauncher(); else process.kill(m.supervisorPid, signal); await m.exited; await gone(tree.child); await gone(tree.grandchild); await gone(m.supervisorPid); } finally { cleanup(child, true); cleanup(supervisor); authority.journal.close(); } } } finally { await rm(root, { recursive: true, force: true }); }
 });
+
+test('launcher cleans the known group after supervisor SIGKILL, including TERM-resistant grandchild', async () => {
+  const root = await mkdtemp(join(tmpdir(), 'keyroot-supervisor-loss-')); const d = wrapper(join(root, 'pids'), Date.now() + 60000); const authority = signedAuthority(d);
+  let child: number | undefined; let supervisor: number | undefined;
+  try {
+    const m = await launchManagedWorkload({ descriptor: d, intent: await authority.authorize(), context, store: { async withValue(_h, _v, use) { await use('synthetic-secret'); return { status: 'resolved' }; } }, trust: authority.trust, heartbeat: { assertHealthy: async () => {} } }); child = m.childPid; supervisor = m.supervisorPid;
+    const tree = await pids(join(root, 'pids')); process.kill(m.supervisorPid, 'SIGKILL'); assert.equal(await m.exited, 'supervisor-lost');
+    await gone(tree.child); await gone(tree.grandchild); await gone(m.supervisorPid);
+  } finally { cleanup(child, true); cleanup(supervisor); authority.journal.close(); await rm(root, { recursive: true, force: true }); }
+});
+
+
+test('abort after await use but before store resolution cleans the actual child and grandchild', async () => {
+  const root = await mkdtemp(join(tmpdir(), 'keyroot-startup-abort-')); const d = wrapper(join(root, 'pids'), Date.now() + 60000); const authority = signedAuthority(d); const controller = new AbortController();
+  let tree: { child: number; grandchild: number } | undefined;
+  try {
+    await assert.rejects(launchManagedWorkload({ descriptor: d, intent: await authority.authorize(), context: { ...context, signal: controller.signal }, store: { async withValue(_h, _v, use) { await use('synthetic-secret'); tree = await pids(join(root, 'pids')); controller.abort(); return { status: 'resolved' }; } }, trust: authority.trust, heartbeat: { assertHealthy: async () => {} } }), /Managed workload refused/);
+    assert.ok(tree); await gone(tree.child); await gone(tree.grandchild);
+  } finally { cleanup(tree?.child, true); authority.journal.close(); await rm(root, { recursive: true, force: true }); }
+});
+
+for (const failure of ['abort-before-ready', 'supervisor-killed-before-commit', 'supervisor-killed-before-pid-report'] as const) {
+  test(`startup PGID handshake fails closed: ${failure}`, async t => {
+    const root = await mkdtemp(join(tmpdir(), 'keyroot-startup-handshake-')); const file = join(root, 'pids'); const d = wrapper(file, Date.now() + 60000); const authority = signedAuthority(d); const controller = new AbortController();
+    let managedPid: number | undefined; let supervisorPid: number | undefined;
+    const originalSpawn = childProcess.spawn;
+    t.mock.method(childProcess, 'spawn', (command: string, args: readonly string[], options: SpawnOptions): ChildProcess => {
+      const child = originalSpawn(command, args, options);
+      if (command === process.execPath && args[0] === '-e' && args[1]?.includes('const gateSource=')) {
+        supervisorPid = child.pid;
+        if (failure === 'supervisor-killed-before-pid-report') {
+          const output = child.stdio[4] as Readable; const emit = output.emit.bind(output);
+          t.mock.method(output, 'emit', (event: string | symbol, ...events: unknown[]) => {
+            if (event === 'data') {
+              const message = JSON.parse(String(events[0])) as { type: string; pid?: number };
+              if (message.type === 'prepared') { managedPid = message.pid; child.kill('SIGKILL'); return true; }
+            }
+            return emit(event, ...events);
+          });
+        }
+        const input = child.stdio[3] as Writable; const write = input.write.bind(input);
+        t.mock.method(input, 'write', (chunk: string) => {
+          const message = JSON.parse(chunk) as { type: string; pid?: number };
+          if (message.type === 'commit') {
+            managedPid = message.pid;
+            if (failure === 'abort-before-ready') controller.abort(); else child.kill('SIGKILL');
+            return true;
+          }
+          return write(chunk);
+        });
+      }
+      return child;
+    });
+    syncBuiltinESMExports();
+    try {
+      await assert.rejects(launchManagedWorkload({ descriptor: d, intent: await authority.authorize(), context: { ...context, signal: controller.signal }, store: { async withValue(_h, _v, use) { await use('synthetic-secret'); return { status: 'resolved' }; } }, trust: authority.trust, heartbeat: { assertHealthy: async () => {} } }), /Managed workload refused/);
+      assert.ok(managedPid && supervisorPid); await gone(managedPid); await gone(supervisorPid);
+      await assert.rejects(readFile(file), { code: 'ENOENT' });
+    } finally { t.mock.restoreAll(); syncBuiltinESMExports(); cleanup(managedPid, true); cleanup(supervisorPid); authority.journal.close(); await rm(root, { recursive: true, force: true }); }
+  });
+}

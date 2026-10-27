@@ -25,7 +25,7 @@ export function createOpenBaoStore(options: Options): ExistingStore {
     try {
       return await Promise.race([
         (async () => {
-          const response = await options.fetch(target, { ...init, signal: controller.signal, headers: { 'X-Vault-Token': options.token, 'Content-Type': 'application/json' } });
+          const response = await options.fetch(target, { ...init, redirect: 'error', signal: controller.signal, headers: { 'X-Vault-Token': options.token, 'Content-Type': 'application/json' } });
           let body: unknown; try { body = await response.json(); } catch { body = undefined; }
           return { status: response.status, body };
         })(),

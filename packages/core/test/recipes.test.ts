@@ -24,13 +24,13 @@ import { canonicalizeManifest, contentDigest, snapshotDigest, type ApprovalManif
 import { recipeDescriptor } from '../src/recipes/recipe.js';
 import { admissionStatus } from '../src/recipes/admission.js';
 
-function signedFixture(recipe: ReturnType<typeof makeRecipe>, purpose: string | string[], fingerprint: string) {
+function signedFixture(recipe: ReturnType<typeof makeRecipe>, purpose: string | string[], fingerprint: string, checkEffectFence?: () => Promise<void>) {
     const purposes = Array.isArray(purpose) ? purpose : [purpose];
     let now = 2000;
     const journal = new Journal(join(mkdtempSync(join(tmpdir(), 'keyroot-recipe-')), 'journal.sqlite'), { installationId: 'installation', bootId: 'boot' });
     const keys = generateKeyPairSync('ec', { namedCurve: 'prime256v1' });
     const publicKey = keys.publicKey.export({ format: 'jwk' });
-    const approvals = new ApprovalService(journal, { mode: 'synthetic', clock: () => now });
+    const approvals = new ApprovalService(journal, { mode: 'synthetic', clock: () => now, ...(checkEffectFence ? { checkEffectFence } : {}) });
     approvals.bootstrapApprover({ signerId: 'phone', role: 'routine', publicKey, localBootstrap: createLocalBootstrapContext(), confirmedFingerprint: publicKeyFingerprint(publicKey) });
     const manifest: ApprovalManifest = { version: 1, domain: 'keyroot.approval.v1', algorithm: 'ECDSA-P256-SHA256', audience: 'keyroot-controller', installationId: 'installation', bootId: 'boot', signerId: 'phone', role: 'routine', nonce: 'nonce', notBefore: 1000, expiresAt: 9000, budgets: { executions: 1, effects: purposes.length, newCredentials: 0, restarts: 0 }, operations: [{ operationId: 'op', accountId: recipe.accountId, lineageId: 'lineage', fromGeneration: 1, toGeneration: 2, actions: purposes.map((purpose, index) => ({ id: index === 0 ? 'admin' : `admin${index}`, kind: 'admin' as const, parameters: { resourceId: recipe.id, recipeId: recipe.id, expectedRevision: recipe.version, destinationId: recipe.destinationId, authorityFingerprint: fingerprint, configurationHash: recipeDescriptor(recipe, purpose, fingerprint) }, budgetCost: { effects: 1, newCredentials: 0, restarts: 0 } })) }], consumerMap: { revision: '1', entries: [], hash: contentDigest([]) }, recipes: [], adoptionThreshold: 'direct-use-every-consumer', overlapPolicy: 'required', deadline: { at: 8000, outcome: 'hold' }, outage: { permitted: false, consequence: 'none' }, graceSeconds: 0 };
     const raw = canonicalizeManifest(manifest);
@@ -83,6 +83,22 @@ test('synthetic proof and signed admission bind broker to exact scope', async ()
     assert.equal(f.journal.listIntents('op')[0]?.state, 'observed');
     runFixture.journal.close();
     f.journal.close();
+});
+
+test('admission expiry during awaited authority fence prevents the reserved recipe effect', async () => {
+    const recipe = makeRecipe({ id: 'vendor', version: '1', accountId: 'account', destinationId: 'store', steps: [{ action: 'open', targetId: 'credentials', checkpoint: 'none' }] });
+    const scope = { actorFingerprint: 'sha256:' + 'a'.repeat(64), authorityFingerprint: 'sha256:' + 'b'.repeat(64), workerFingerprint: 'sha256:' + 'c'.repeat(64), expiresAt: 7000 };
+    const admissionFixture = signedFixture(recipe, admissionPurpose(scope), scope.authorityFingerprint);
+    const proof = await rehearseSynthetic(recipe, scope, 2000, [{ kind: 'status', value: 'visible' }]);
+    const admission = await admitSynthetic(admissionFixture.approvals, admissionFixture.request, recipe, scope, proof, 2000);
+    let clock = 2000; let calls = 0;
+    const runFixture = signedFixture(recipe, runPurpose('delayed', 0, 'step', 'open', 'credentials'), scope.authorityFingerprint, async () => { await Promise.resolve(); clock = 7100; });
+    const port: DashboardPort = { async perform() { calls++; }, async captureToMappedStore() {}, async sealProfile() {}, async restoreProfile() {} };
+    const worker = syntheticWorker(admission, recipe, scope, { approvals: runFixture.approvals, runId: 'delayed', commands: [{ kind: 'step', action: 'open', targetId: 'credentials', request: runFixture.request }], clock: () => clock, currentSnapshot: () => runFixture.request.currentSnapshotDigest }, port);
+    await assert.rejects(worker.dispatch({ kind: 'step', accountId: 'account', destinationId: 'store', action: 'open', targetId: 'credentials', signal: 'expected' }));
+    assert.equal(calls, 0);
+    assert.equal(runFixture.journal.listIntents('op')[0]?.state, 'pending');
+    runFixture.journal.close(); admissionFixture.journal.close();
 });
 
 test('guided drafts resume in journal and reject changed recipe', () => {

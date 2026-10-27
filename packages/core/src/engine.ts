@@ -283,7 +283,10 @@ INSERT INTO engine_schema VALUES(1,1);`);
     if (before && (before.lineageId !== op.lineageId || before.accountId !== op.accountId || before.fromGeneration !== op.fromGeneration || before.toGeneration !== op.toGeneration)) throw new Error('Stable operation identity mismatch');
     if (before?.state === 'completed') return this.inspect(op.operationId);
     const emergencyContainment = manifest.role === 'emergency' && op.actions.every(a => a.kind === 'revoke' && a.parameters.generation === op.fromGeneration && !a.parameters.resourceId?.startsWith('created:'));
-    if (!emergencyContainment && this.journal.listIntents(op.operationId).some(i => i.state !== 'observed')) {
+    const first = op.actions[0];
+    const revokeFirst = manifest.role === 'emergency' && manifest.outage.permitted && first?.kind === 'revoke' && first.parameters.reasonCode === 'incident-revoke-first' && first.parameters.generation === op.fromGeneration && !!first.parameters.resourceId && !first.parameters.resourceId.startsWith('created:');
+    const pendingContainment = revokeFirst && !this.journal.listIntents(op.operationId).some(i => i.actionId === first.id);
+    if (!emergencyContainment && !pendingContainment && this.journal.listIntents(op.operationId).some(i => i.state !== 'observed')) {
       const state = await this.reconcilePending(op.operationId);
       if (state.state === 'reconcile-required' || state.holds.length) return state;
     }
@@ -300,12 +303,22 @@ INSERT INTO engine_schema VALUES(1,1);`);
       if (action.kind === 'create' && (action.budgetCost.effects < 2 || action.budgetCost.newCredentials < 1)) throw new Error('Compound create/store requires two effects and one new credential');
       if (action.kind === 'create' && this.journal.listIntents(op.operationId).some(i => i.kind === 'create')) throw new Error('Creation already attempted for stable operation; reconcile it');
       if (action.kind === 'create') this.expectedStoreVersion(action.parameters as AuthorizedIntent['parameters']);
+      if (revokeFirst && ['create', 'validate', 'deliver'].includes(action.kind)) {
+        const old = this.subject(op, first, manifest);
+        await this.observe(op.operationId, old, 'issuer', (s, signal) => this.drivers.observeIssuer(s, signal));
+        await this.observe(op.operationId, old, 'probe', (s, signal) => this.drivers.probeOld(s, signal));
+        const state = this.inspect(op.operationId);
+        const revoked = state.receipts.filter(r => r.kind === 'revoke').at(-1);
+        const issuer = state.receipts.filter(r => r.kind === 'issuer').at(-1);
+        const probe = state.receipts.filter(r => r.kind === 'probe').at(-1);
+        if (!revoked || state.issuer !== 'confirmed-revoked' || state.probe !== 'rejected' || !this.fresh(issuer) || !this.fresh(probe) || issuer.observedAt < revoked.observedAt || probe.observedAt < revoked.observedAt) return this.status(op.operationId, ['revoke-first-containment-unverified'], deadline);
+      }
       if (['validate', 'deliver'].includes(action.kind) && this.receipts(op.operationId).every(r => r.kind !== 'create' || r.outcome !== 'stored')) throw new Error('Replacement not stored');
       if (action.kind === 'deliver' && !this.replacementValidated(op.operationId, op)) return this.status(op.operationId, ['replacement-not-validated'], deadline);
       if (action.kind === 'revoke') {
         deadline = deadlineDisposition(manifest, this.now());
         if (action.parameters.generation !== op.fromGeneration || action.parameters.resourceId?.startsWith('created:')) throw new Error('Ordinary revoke must name old generation');
-        const holds = emergencyContainment ? [] : await this.revokeHolds(op, manifest, deadline === 'hard-outage');
+        const holds = emergencyContainment || revokeFirst && action.id === first.id ? [] : await this.revokeHolds(op, manifest, deadline === 'hard-outage');
         if (holds.length) return this.status(op.operationId, [...holds, ...(deadline === 'overdue-exposure' ? ['overdue-exposure'] : [])], deadline);
       }
       if (action.kind === 'cleanup') {

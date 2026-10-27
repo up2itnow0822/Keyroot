@@ -6,11 +6,12 @@ import type { ExistingStore } from '../src/adapters/store.js';
 const store = (status: 'written' | 'conflict' = 'written'): ExistingStore => ({ write: async () => status === 'written' ? { status, version: 1 } : { status }, metadata: async () => ({ status: 'not-found' }), consumer: () => ({ withValue: async () => ({ status: 'not-found' }) }) });
 const config = { kind: 'synthetic' as const, accountId: 'org-a', projectId: 'proj-a', serviceAccountId: 'sa-a', adminToken: 'admin-secret' };
 test('create stores one-time secret and returns only metadata', async () => {
-  let request: { url: string; body: unknown } | undefined;
-  const adapter = createOpenAIServiceAccountAdapter({ ...config, store: store(), fetch: async (url, init) => { request = { url: String(url), body: JSON.parse(String(init?.body)) }; return Response.json({ object: 'organization.project.service_account.api_key', id: 'key-a', name: 'keyroot-op-1', value: 'sentinel-secret' }); } });
+  let request: { url: string; body: unknown; redirect: RequestRedirect | undefined } | undefined;
+  const adapter = createOpenAIServiceAccountAdapter({ ...config, store: store(), fetch: async (url, init) => { request = { url: String(url), body: JSON.parse(String(init?.body)), redirect: init?.redirect }; return Response.json({ object: 'organization.project.service_account.api_key', id: 'key-a', name: 'keyroot-op-1', value: 'sentinel-secret' }); } });
   const result = await adapter.create({ operationId: 'op-1', scopes: ['api.read'], expiresInSeconds: 3600 });
   assert.equal(request?.url, 'https://api.openai.com/v1/organization/projects/proj-a/service_accounts/sa-a/api_keys');
   assert.deepEqual(request?.body, { name: 'keyroot-op-1', scopes: ['api.read'], expires_in_seconds: 3600 });
+  assert.equal(request?.redirect, 'error');
   assert.equal(result.status, 'created');
   assert.equal(JSON.stringify(result).includes('sentinel-secret'), false);
 });

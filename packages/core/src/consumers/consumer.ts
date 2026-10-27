@@ -46,6 +46,7 @@ export async function beforeConsumerEffect(intent: AuthorizedIntent, d: Readonly
   try {
     if (await trust.quarantine(d.consumerId, d.destinationId) !== 'clear') throw new ConsumerRefusal();
     await trust.beforeEffect(intent, boundary);
+    if (await trust.quarantine(d.consumerId, d.destinationId) !== 'clear') throw new ConsumerRefusal();
     assertConsumerIntent(intent, d, context);
   } catch { throw new ConsumerRefusal(); }
 }

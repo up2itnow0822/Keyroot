@@ -9,6 +9,7 @@
 ## Local Contracts
 - Synthetic worker construction requires scoped admission and finite signed execution context.
 - Mediate each step, capture, seal and restore; page instructions cannot add capabilities.
+- Recheck scoped admission after asynchronous authorization and immediately before the effect.
 - Host-file, cross-profile, shell and vault-administration operations are absent from this port.
 - This module does not establish OS/browser isolation. Live unattended execution remains unavailable without its independent runtime and account proofs.
 

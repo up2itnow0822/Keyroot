@@ -111,6 +111,7 @@ export function syntheticWorker(admission: SyntheticAdmission, recipe: Recipe, s
             if (!command || command.kind !== kind || (kind === 'step' && (command.kind !== 'step' || command.action !== action || command.targetId !== target))) throw new Error('Run command outside signed sequence');
             const request = { ...command.request, currentSnapshotDigest: run.currentSnapshot() };
             const intentId = await authorizeRecipeAction(run.approvals, request, pinned, runPurpose(run.runId, index, kind, action, target), scope.authorityFingerprint);
+            if (!matches(admissions.get(admission), pinned, scope, run.clock())) throw new Error('Admission expired during authority verification');
             // If the effect throws, its intent remains unresolved for reconciliation.
             await effect();
             recordRecipeAction(run.approvals, request, pinned, intentId, ['synthetic-only', 'provider-unverified']);
