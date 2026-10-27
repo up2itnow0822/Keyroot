@@ -12,6 +12,7 @@
     "packages/*"
   ],
   "scripts": {
+    "keyroot": "node scripts/keyroot.mjs",
     "dev": "node scripts/dev.mjs",
     "build": "tsc -p apps/controller/tsconfig.build.json && npm run build --workspace @keyroot/review && npm run build:phone --workspace @keyroot/review",
     "typecheck": "tsc --noEmit && tsc -p apps/review/tsconfig.json",

@@ -20,6 +20,8 @@ export interface ActionParameters {
     reasonCode?: string;
     /** SHA-256 of the content-addressed, secret-free executor configuration descriptor. */
     configurationHash?: string;
+    /** Content hash of the complete declared incident policy and quarantine set. */
+    incidentPlanHash?: string;
 }
 export interface ManifestAction {
     id: string;
@@ -55,6 +57,8 @@ export interface ApprovalManifest {
         revision: string;
         hash: string;
         entries: {
+            /** Omitted only for legacy entries shared by every signed operation. */
+            lineageId?: string;
             consumerId: string;
             resourceId: string;
             revision: string;
@@ -153,9 +157,9 @@ export function validateManifest(value: unknown): asserts value is ApprovalManif
             object(a, ['id', 'kind', 'parameters', 'budgetCost']);
             id(a.id);
             choice(a.kind, actionKinds);
-            object(a.parameters, [], ['resourceId', 'consumerId', 'destinationId', 'handleId', 'generation', 'expectedRevision', 'recipeId', 'adapterId', 'authorityFingerprint', 'reasonCode', 'configurationHash']);
+            object(a.parameters, [], ['resourceId', 'consumerId', 'destinationId', 'handleId', 'generation', 'expectedRevision', 'recipeId', 'adapterId', 'authorityFingerprint', 'reasonCode', 'configurationHash', 'incidentPlanHash']);
             for (const [k, v] of Object.entries(a.parameters)) {
-                if (k === 'configurationHash') {
+                if (k === 'configurationHash' || k === 'incidentPlanHash') {
                     if (typeof v !== 'string' || !/^sha256:[a-f0-9]{64}$/.test(v)) throw new Error('Invalid configuration hash');
                 }
                 else if (k === 'generation')
@@ -180,13 +184,18 @@ export function validateManifest(value: unknown): asserts value is ApprovalManif
     object(value.consumerMap, ['revision', 'hash', 'entries']);
     id(value.consumerMap.revision);
     list(value.consumerMap.entries);
+    const lineages = new Set(value.operations.map(o => (o as ManifestOperation).lineageId));
     for (const e of value.consumerMap.entries) {
-        object(e, ['consumerId', 'resourceId', 'revision']);
+        object(e, ['consumerId', 'resourceId', 'revision'], ['lineageId']);
         Object.values(e).forEach(id);
+        if (e.lineageId !== undefined && !lineages.has(String(e.lineageId)))
+            throw new Error('Consumer map lineage outside signed operations');
     }
-    unique(value.consumerMap.entries.map(e => (e as {
-        consumerId: string;
-    }).consumerId));
+    const entries = value.consumerMap.entries as ApprovalManifest['consumerMap']['entries'];
+    unique(entries.map(e => canonicalJSON([e.lineageId ?? null, e.consumerId])));
+    const globalConsumers = new Set(entries.filter(e => e.lineageId === undefined).map(e => e.consumerId));
+    if (entries.some(e => e.lineageId !== undefined && globalConsumers.has(e.consumerId)))
+        throw new Error('Ambiguous global consumer mapping');
     if (value.consumerMap.hash !== contentDigest(value.consumerMap.entries))
         throw new Error('Consumer map hash mismatch');
     list(value.recipes);
@@ -219,6 +228,10 @@ export function validateManifest(value: unknown): asserts value is ApprovalManif
         throw new Error('Outage consequence required');
     if ((value.deadline.outcome === 'hard-revoke' || value.overlapPolicy === 'unavailable') && !value.outage.permitted)
         throw new Error('Outage authority required');
+}
+/** Legacy global entries apply to all operations; explicit entries bind one signed lineage. */
+export function applicableConsumers(manifest: ApprovalManifest, operation: Pick<ManifestOperation, 'lineageId'>): ApprovalManifest['consumerMap']['entries'] {
+    return manifest.consumerMap.entries.filter(entry => entry.lineageId === undefined || entry.lineageId === operation.lineageId);
 }
 /** Deterministic key ordering; input byte equality additionally rejects duplicate keys and alternate numbers. */
 export function canonicalJSON(value: unknown): string {

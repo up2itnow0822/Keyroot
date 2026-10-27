@@ -25,8 +25,8 @@
 - Keep evidence references and stable IDs. Report credential/provider coverage and uncertainty explicitly.
 
 ## Verification
-- Check local artifact links, referenced source identifiers, and DOX index consistency before closing discovery work.
-- Root npm scripts own static checks, build, unit/integration/browser contracts and Sites packaging. Missing suites fail explicitly until implemented.
+- Check artifact links, source identifiers and DOX index consistency before closing work.
+- Root npm scripts own static checks, build, unit/integration/browser contracts and Sites packaging. Tests do not close physical or account admission gates.
 
 ## User Preferences
 - Preserve the selected warm editorial review layout with light and dark appearances.
@@ -38,4 +38,5 @@
 - `packages/AGENTS.md` — owns shared lifecycle domain and synthetic fixtures.
 - `scripts/AGENTS.md` — owns local orchestration and verification commands.
 - `tests/AGENTS.md` — owns synthetic integration and browser-component contracts.
+- `.github/AGENTS.md` — owns read-only CI workflow configuration.
 - Root retains ownership of product-wide instructions, top-level workflow records, and tool-managed router housekeeping.

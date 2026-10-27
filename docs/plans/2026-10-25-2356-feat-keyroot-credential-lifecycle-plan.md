@@ -17,6 +17,7 @@ execution: code
 - **Product authority:** Bill approved this scope for his personal four-machine setup and connected platforms; this document records product behavior, not permission for live credential operations.
 - **Open blockers:** None before implementation planning; account capabilities, enforcement, recovery, and operating cost require evidence during planning and validation.
 - **Execution profile:** Build and review the local coordinator, adapters, companion approval flow, and selected review UI; keep real credential mutation disabled until its account, store, signer, authority, and recovery gates pass.
+- **Store clarification, 2026-10-26:** Bill currently has 1Password and is planning an Infisical-style vault. This does not establish a self-hosted store or change R2 automatically. The [1Password assessment](../operations/onepassword.md) identifies the unresolved hosting and conditional-write/fencing boundary; the live pilot remains gated on that decision and actual account evidence.
 - **Product Contract preservation:** R1–R80, F1–F8, and AE1–AE27 remain unchanged; R81 and AE28 record Bill's selected light/dark experience, while R82–R83 add inferred theme-continuity behavior for review. The Problem Frame and source-provenance wording remove private history and local input links without changing product behavior.
 
 ---

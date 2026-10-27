@@ -1,7 +1,7 @@
 import { randomUUID } from 'node:crypto';
 import { ApprovalService, type AuthorizeEffectRequest } from './approval.js';
 import { Journal, type AuthorizedIntent, type MetadataReceipt } from './journal.js';
-import { canonicalJSON, deepFreeze, parseCanonicalManifest, snapshotDigest, type ApprovalManifest, type ManifestAction, type ManifestOperation } from './manifest.js';
+import { applicableConsumers, canonicalJSON, deepFreeze, parseCanonicalManifest, snapshotDigest, type ApprovalManifest, type ManifestAction, type ManifestOperation } from './manifest.js';
 import { deadlineDisposition, type DeadlineDisposition } from './deadline.js';
 import { assertReceiptSubject, safeReceipt, type LifecycleReceipt, type LifecycleReceiptKind, type ReceiptSubject } from './receipts.js';
 import { resolveCreatedReference } from './reconciliation.js';
@@ -102,8 +102,8 @@ INSERT INTO engine_schema VALUES(1,1);`);
     if (!reference) throw new Error('Missing bound resource');
     const subject: ReceiptSubject = { operationId: op.operationId, lineageId: op.lineageId, accountId: op.accountId, generation, resourceId: resolveCreatedReference(reference, op, this.receipts(op.operationId)), handleId: String(action.parameters.handleId), consumerMapRevision: manifest.consumerMap.revision };
     if (action.parameters.consumerId) {
-      const entry = manifest.consumerMap.entries.find(e => e.consumerId === action.parameters.consumerId);
-      if (!entry || action.parameters.expectedRevision !== entry.revision) throw new Error('Delivery outside exact consumer mapping');
+      const entry = applicableConsumers(manifest, op).find(e => e.consumerId === action.parameters.consumerId);
+      if (!entry || action.parameters.expectedRevision !== entry.revision || action.kind === 'deliver' && entry.lineageId !== undefined && action.parameters.destinationId !== entry.resourceId) throw new Error('Delivery outside exact consumer mapping');
       subject.consumerId = entry.consumerId; subject.revision = entry.revision;
     }
     return deepFreeze(subject);
@@ -212,7 +212,7 @@ INSERT INTO engine_schema VALUES(1,1);`);
     return action;
   }
   private consumerSubject(op: ManifestOperation, manifest: ApprovalManifest, consumerId: string): ReceiptSubject {
-    const entry = manifest.consumerMap.entries.find(e => e.consumerId === consumerId);
+    const entry = applicableConsumers(manifest, op).find(e => e.consumerId === consumerId);
     const created = this.receipts(op.operationId).find(r => r.kind === 'create' && r.outcome === 'stored');
     if (!entry || !created) throw new Error('Consumer replacement binding missing');
     return deepFreeze({ ...created.subject, consumerMapRevision: manifest.consumerMap.revision, consumerId, revision: entry.revision });
@@ -240,12 +240,12 @@ INSERT INTO engine_schema VALUES(1,1);`);
   private async revokeHolds(op: ManifestOperation, manifest: ApprovalManifest, hard: boolean): Promise<string[]> {
     const id = op.operationId;
     if (hard) return [];
-    for (const entry of manifest.consumerMap.entries) await this.observe(id, this.consumerSubject(op, manifest, entry.consumerId), 'consumer-use', (subject, signal) => this.drivers.observeConsumer(subject, signal));
+    for (const entry of applicableConsumers(manifest, op)) await this.observe(id, this.consumerSubject(op, manifest, entry.consumerId), 'consumer-use', (subject, signal) => this.drivers.observeConsumer(subject, signal));
     const old = this.subject(op, this.oldAction(op), manifest);
     await this.observe(id, old, 'old-use', (subject, signal) => this.drivers.observeOldUse(subject, signal));
     const receipts = this.receipts(id); const holds: string[] = [];
     if (!this.replacementValidated(id, op)) holds.push('replacement-not-validated');
-    for (const entry of manifest.consumerMap.entries) {
+    for (const entry of applicableConsumers(manifest, op)) {
       const delivery = receipts.filter(r => r.kind === 'deliver' && r.subject.consumerId === entry.consumerId && r.subject.revision === entry.revision && r.subject.consumerMapRevision === manifest.consumerMap.revision && r.subject.generation === op.toGeneration && r.outcome === 'delivery-accepted').at(-1);
       if (!delivery) holds.push(`delivery-unverified:${entry.consumerId}`);
       const use = receipts.filter(r => r.kind === 'consumer-use' && r.subject.consumerId === entry.consumerId && r.subject.revision === entry.revision && r.subject.consumerMapRevision === manifest.consumerMap.revision && r.subject.generation === op.toGeneration).at(-1);

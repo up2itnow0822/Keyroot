@@ -1,7 +1,7 @@
 import type { DatabaseSync } from 'node:sqlite';
 import { createHash, createPublicKey, verify, randomUUID, type JsonWebKey as NodeJsonWebKey } from 'node:crypto';
 import { Journal, type AuthorizedIntent, type OperationRecord } from './journal.js';
-import { actionCost, canonicalJSON, deepFreeze, manifestDigest, parseCanonicalManifest, snapshotDigest, type ApprovalManifest, type ManifestOperation, type ManifestAction, type SignerRole } from './manifest.js';
+import { actionCost, applicableConsumers, canonicalJSON, deepFreeze, manifestDigest, parseCanonicalManifest, snapshotDigest, type ApprovalManifest, type ManifestOperation, type ManifestAction, type SignerRole } from './manifest.js';
 const localBootstraps = new WeakSet<object>();
 export interface LocalBootstrapContext {
     readonly kind: 'local-console-bootstrap';
@@ -147,7 +147,7 @@ export class ApprovalService {
         const target = action.parameters.resourceId;
         if (!target || target.startsWith('created:') || (action.kind !== 'quarantine' && action.parameters.generation !== operation.fromGeneration))
             throw new Error('Containment requires concrete known old resource');
-        if (action.kind === 'quarantine' && !manifest.consumerMap.entries.some(e => e.consumerId === action.parameters.consumerId))
+        if (action.kind === 'quarantine' && !applicableConsumers(manifest, operation).some(e => e.consumerId === action.parameters.consumerId))
             throw new Error('Quarantine consumer outside exact signed map');
         for (const row of unresolved) {
             if (row.intent_id === reservedIntentId)
@@ -238,6 +238,11 @@ export class ApprovalService {
             const operation = manifest.operations.find(op => op.operationId === request.operationId);
             const action = operation?.actions.find(a => a.id === request.actionId);
             if (!operation || !action) throw new Error('Action outside signed finite scope');
+            if (manifest.consumerMap.entries.some(entry => entry.lineageId === undefined) || manifest.operations.some(op => op.actions.some(candidate => {
+                if (candidate.kind !== 'deliver') return false;
+                const entry = applicableConsumers(manifest, op).find(item => item.consumerId === candidate.parameters.consumerId);
+                return !entry || entry.resourceId !== candidate.parameters.destinationId || entry.revision !== candidate.parameters.expectedRevision;
+            }))) throw new Error('Real delivery requires explicit lineage consumer mapping');
             return deepFreeze({ installationId: this.journal.installationId, bootId: this.journal.bootId, phase, now, snapshotDigest: request.currentSnapshotDigest, operation, action });
         });
         const result = await this.options.assertRealAdmission(context);

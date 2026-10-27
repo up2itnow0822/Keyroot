@@ -4,6 +4,23 @@ import { isoCBOR, decodeClientDataJSON } from '@simplewebauthn/server/helpers';
 import { ApprovalService, publicKeyFingerprint, type LocalBootstrapContext } from './approval.js';
 import { Journal } from './journal.js';
 import { contentDigest, parseCanonicalManifest } from './manifest.js';
+/** Public, nonsecret hash preimage. The separate phone must check it against its locally reviewed manifest before WebAuthn. */
+export interface EmergencyChallengeBinding {
+    readonly domain: 'keyroot.emergency.webauthn.v1';
+    readonly digest: string;
+    readonly role: 'emergency';
+    readonly operationId: string;
+    readonly actionId: string;
+    readonly nonce: string;
+}
+export interface EmergencyChallenge {
+    challengeId: string;
+    challenge: string;
+    rpId: string;
+    credentialId: string;
+    expiresAt: number;
+    binding: EmergencyChallengeBinding;
+}
 interface ChallengeRow {
     challenge_id: string;
     signer_id: string;
@@ -109,13 +126,7 @@ export class EmergencyWebAuthn {
         operationId: string;
         actionId: string;
         now?: number;
-    }): {
-        challengeId: string;
-        challenge: string;
-        rpId: string;
-        credentialId: string;
-        expiresAt: number;
-    } {
+    }): EmergencyChallenge {
         const now = input.now ?? Date.now();
         return this.journal.transaction(db => {
             this.journal.assertCurrent(db);
@@ -131,10 +142,11 @@ export class EmergencyWebAuthn {
             if (!credential)
                 throw new Error('Emergency credential missing');
             const challengeId = randomUUID();
-            const challenge = Buffer.from(contentDigest({ domain: 'keyroot.emergency.webauthn.v1', digest: grant.digest, role: 'emergency', operationId: input.operationId, actionId: input.actionId, nonce: randomBytes(32).toString('base64url') })).toString('base64url');
+            const binding: EmergencyChallengeBinding = Object.freeze({ domain: 'keyroot.emergency.webauthn.v1', digest: String(grant.digest), role: 'emergency', operationId: input.operationId, actionId: input.actionId, nonce: randomBytes(32).toString('base64url') });
+            const challenge = Buffer.from(contentDigest(binding), 'utf8').toString('base64url');
             const expiresAt = Math.min(now + 60000, manifest.expiresAt);
             db.prepare('INSERT INTO emergency_challenge VALUES(?,?,?,?,?,?,?,?,0)').run(challengeId, manifest.signerId, input.grantId, String(grant.digest), input.operationId, input.actionId, challenge, expiresAt);
-            return { challengeId, challenge, rpId: credential.rp_id, credentialId: credential.credential_id, expiresAt };
+            return { challengeId, challenge, rpId: credential.rp_id, credentialId: credential.credential_id, expiresAt, binding };
         });
     }
     async verifyAssertion(input: {

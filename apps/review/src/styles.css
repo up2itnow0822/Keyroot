@@ -206,3 +206,11 @@ a { color: inherit; }
   .evidence-list dd { margin-top: 5px; }
 }
 @media (prefers-reduced-motion: reduce) { *, *::before, *::after { animation: none !important; transition: none !important; scroll-behavior: auto !important; } }
+.hero form { display: grid; gap: 14px; max-width: 620px; }
+.hero label { display: block; margin: 12px 0; }
+.hero input { display: block; width: 100%; max-width: 520px; padding: 10px; margin-top: 6px; color: inherit; background: transparent; border: 1px solid currentColor; border-radius: 4px; }
+.drawer-surface label { display: block; margin: 14px 0; }
+.drawer-surface input:not([type=checkbox]), .drawer-surface select { display: block; width: 100%; margin-top: 6px; padding: 10px; color: inherit; background: var(--surface, transparent); border: 1px solid currentColor; border-radius: 4px; }
+.drawer-surface fieldset { border: 0; padding: 0; margin: 18px 0; }
+.drawer-surface .button { margin: 8px 8px 8px 0; }
+.drawer-surface code { overflow-wrap: anywhere; }

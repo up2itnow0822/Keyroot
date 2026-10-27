@@ -1,0 +1,48 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - name: Check out source
+        uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+        with:
+          persist-credentials: false
+      - name: Set up Node
+        uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6
+        with:
+          node-version: '24.18.0'
+      - name: Verify npm major version
+        run: node -e "if (Number(require('child_process').execFileSync('npm', ['--version'], {encoding:'utf8'}).split('.')[0]) !== 11) process.exit(1)"
+      - name: Install locked dependencies
+        run: npm ci
+      - name: Typecheck
+        run: npm run typecheck
+      - name: Lint
+        run: npm run lint
+      - name: Unit tests
+        run: npm test
+      - name: Check Docker availability
+        run: docker version
+      - name: Integration tests including actual OpenBao fixture
+        run: npm run test:integration
+      - name: Browser component contracts
+        run: npm run test:browser
+      - name: Build
+        run: npm run build
+      - name: Sites packaging tests
+        run: npm run test:sites
+      - name: Traceability contracts
+        run: npm run verify:contracts
+      - name: Secret audit
+        run: npm run verify:secrets

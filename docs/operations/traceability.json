@@ -1,0 +1,699 @@
+{
+  "R1": {
+    "status": "pending-physical",
+    "evidence": "packages/core/test/adapters-openbao.test.ts: bounded software evidence relevant to Keyroot serves Bill's four machines and connected platforms from a dedicated tailnet box that does not host arbitrary third-party development agents or MCP servers. Limit: dedicated host and selected existing store are not verified.",
+    "owner": "Bill"
+  },
+  "R2": {
+    "status": "pending-physical",
+    "evidence": "packages/core/test/adapters-openbao.test.ts exercises reference CAS and scoped reads. docs/operations/onepassword.md and onepassword-pilot-proposal.md record the current hosted-store/ownership design decision. No pilot store, account authority or physical admission is verified; proposed amendments are not accepted requirements.",
+    "owner": "Bill"
+  },
+  "R3": {
+    "status": "pending-physical",
+    "evidence": "packages/core/test/discovery.test.ts: bounded software evidence relevant to Discovery inspects authorized machine and platform sources read-only and lists unplaced, inaccessible, and unscanned sources. Limit: scanning and mapping fixtures do not prove four-machine coverage.",
+    "owner": "Bill"
+  },
+  "R4": {
+    "status": "pending-physical",
+    "evidence": "packages/core/test/discovery.test.ts: bounded software evidence relevant to The inventory distinguishes issuer, account, credential type, lineage, generation, grant identity, and each named consumer binding. Limit: scanning and mapping fixtures do not prove four-machine coverage.",
+    "owner": "Bill"
+  },
+  "R5": {
+    "status": "pending-physical",
+    "evidence": "packages/core/test/discovery.test.ts: bounded software evidence relevant to Each association records its source, last observation, and whether it was declared, observed, or inferred. Limit: scanning and mapping fixtures do not prove four-machine coverage.",
+    "owner": "Bill"
+  },
+  "R6": {
+    "status": "pending-physical",
+    "evidence": "packages/core/test/discovery.test.ts: bounded software evidence relevant to Discovery never revokes or replaces an existing value until Bill separately approves a migration plan. Limit: scanning and mapping fixtures do not prove four-machine coverage.",
+    "owner": "Bill"
+  },
+  "R7": {
+    "status": "pending-physical",
+    "evidence": "packages/core/test/discovery.test.ts: bounded software evidence relevant to Keyroot shows coverage per credential, account, and consumer without implying unknown or dormant copies are absent. Limit: scanning and mapping fixtures do not prove four-machine coverage.",
+    "owner": "Bill"
+  },
+  "R8": {
+    "status": "pending-account",
+    "evidence": "packages/core/test/federation.test.ts: bounded software evidence relevant to Keyroot recommends removing a stored static credential only when an existing issuer, Bill's account entitlement, and that consumer support native workload federation. Limit: synthetic federation does not prove account or identity-only deployment.",
+    "owner": "Bill"
+  },
+  "R9": {
+    "status": "pending-account",
+    "evidence": "packages/core/test/federation.test.ts: bounded software evidence relevant to A federation migration verifies that the consumer uses the new identity and no static-key fallback takes precedence before retiring the key. Limit: synthetic federation does not prove account or identity-only deployment.",
+    "owner": "Bill"
+  },
+  "R10": {
+    "status": "pending-physical",
+    "evidence": "packages/core/test/oauth.test.ts: bounded software evidence relevant to Production applications and CI have no Keyroot request-time or refresh-time dependency. Limit: external production refresh independence needs deployment verification.",
+    "owner": "Bill"
+  },
+  "R11": {
+    "status": "pending-account",
+    "evidence": "packages/core/test/capability.test.ts: bounded software evidence relevant to Credentials that cannot be rotated safely remain inventoried with their manual or unknown coverage visible. Limit: account entitlement and actual consumer capabilities remain unverified.",
+    "owner": "Bill"
+  },
+  "R12": {
+    "status": "pending-account",
+    "evidence": "packages/core/test/capability.test.ts: bounded software evidence relevant to Each credential/account/consumer capability record distinguishes documented, account-tested, and unavailable create, validate, deliver, observe, and revoke actions. Limit: account entitlement and actual consumer capabilities remain unverified.",
+    "owner": "Bill"
+  },
+  "R13": {
+    "status": "pending-account",
+    "evidence": "packages/core/test/capability.test.ts: bounded software evidence relevant to A consumer uses a supported native integration, managed delivery, assisted update, or inventory-only path according to its verified capabilities. Limit: account entitlement and actual consumer capabilities remain unverified.",
+    "owner": "Bill"
+  },
+  "R14": {
+    "status": "pending-account",
+    "evidence": "packages/core/test/inventory.test.ts: bounded software evidence relevant to Each external consumer gets its own credential by default where the issuer permits, with one slot reserved for replacement overlap. Limit: allocation logic does not establish issuer slot availability.",
+    "owner": "Bill"
+  },
+  "R15": {
+    "status": "pending-account",
+    "evidence": "packages/core/test/inventory.test.ts: bounded software evidence relevant to Dev-machine consumers share one box-delivered credential by default, while Bill may choose another allocation including per-device keys where capacity and maintenance permit. Limit: allocation logic does not establish issuer slot availability.",
+    "owner": "Bill"
+  },
+  "R16": {
+    "status": "pending-account",
+    "evidence": "packages/core/test/inventory.test.ts: bounded software evidence relevant to When slots prevent that allocation, Keyroot first evaluates sharing or consolidation to restore overlap and labels any remaining non-overlap replacement for R43's outage route. Limit: allocation logic does not establish issuer slot availability.",
+    "owner": "Bill"
+  },
+  "R17": {
+    "status": "pending-physical",
+    "evidence": "packages/core/test/wrapper.test.ts: bounded software evidence relevant to Dev-machine tools other than native subscription clients may use mapped local helpers or launch wrappers for credential delivery. Limit: fixture wrapper and mapping do not prove real machine isolation.",
+    "owner": "Bill"
+  },
+  "R18": {
+    "status": "pending-physical",
+    "evidence": "packages/core/test/wrapper.test.ts: bounded software evidence relevant to Consumer delivery authority permits only mapped material and cannot administer or enumerate the store. Limit: fixture wrapper and mapping do not prove real machine isolation.",
+    "owner": "Bill"
+  },
+  "R19": {
+    "status": "pending-physical",
+    "evidence": "tests/integration/http-auth.test.ts: bounded software evidence relevant to Owner administration, consumer delivery, and connector execution use separate authorities. Limit: local authorization tests do not establish physical signer custody or isolation.",
+    "owner": "Bill"
+  },
+  "R20": {
+    "status": "pending-physical",
+    "evidence": "tests/integration/http-auth.test.ts: bounded software evidence relevant to A claimed connector action limit requires a trusted executor that mediates every privileged action and a runtime that cannot bypass it. Limit: local authorization tests do not establish physical signer custody or isolation.",
+    "owner": "Bill"
+  },
+  "R21": {
+    "status": "pending-physical",
+    "evidence": "tests/integration/http-auth.test.ts: bounded software evidence relevant to Owner administration of the box or store requires Bill's phone-signed approval rather than tailnet identity, with the enrolled YubiKey limited to its emergency role under R74. Limit: local authorization tests do not establish physical signer custody or isolation.",
+    "owner": "Bill"
+  },
+  "R22": {
+    "status": "automated",
+    "evidence": "packages/core/test/schedule.test.ts: bounded software evidence relevant to Bill sets a credential interval from 1 to 90 days, with longer custom intervals allowed only with a warning. Limit: forecast and warning tests use synthetic dates and issuer metadata.",
+    "owner": "project"
+  },
+  "R23": {
+    "status": "automated",
+    "evidence": "packages/core/test/schedule.test.ts: bounded software evidence relevant to The schedule forecasts owner prompts and respects earlier issuer expiry or required reauthorization. Limit: forecast and warning tests use synthetic dates and issuer metadata.",
+    "owner": "project"
+  },
+  "R24": {
+    "status": "pending-physical",
+    "evidence": "packages/core/test/U3.test.ts: bounded software evidence relevant to A weekly phone review presents a finite batch or bounded schedule of credential lineages, accounts, consumer-map revision, admitted recipe versions, execution and new-credential counts, restart budget, time range, adoption-evidence threshold, overlap policy, outage permission, and expiry. Limit: cryptographic authority and replay tests do not establish phone custody or real provider eligibility.",
+    "owner": "Bill"
+  },
+  "R25": {
+    "status": "pending-physical",
+    "evidence": "packages/core/test/U3.test.ts: bounded software evidence relevant to Bill's phone-held key or emergency-only YubiKey signs each approval bound to its listed operation instances and expected generation succession, while changed consumers, privileges, recipes, or outage behavior require new approval. Limit: cryptographic authority and replay tests do not establish phone custody or real provider eligibility.",
+    "owner": "Bill"
+  },
+  "R26": {
+    "status": "pending-physical",
+    "evidence": "packages/core/test/U3.test.ts: bounded software evidence relevant to Each authorized instance is consumed once, and restore invalidates outstanding approvals pending issuer-state reconciliation. Limit: cryptographic authority and replay tests do not establish phone custody or real provider eligibility.",
+    "owner": "Bill"
+  },
+  "R27": {
+    "status": "pending-physical",
+    "evidence": "packages/core/test/U3.test.ts: bounded software evidence relevant to Expired approval permits observation and reconciliation but no new mutation without fresh authority. Limit: cryptographic authority and replay tests do not establish phone custody or real provider eligibility.",
+    "owner": "Bill"
+  },
+  "R28": {
+    "status": "pending-physical",
+    "evidence": "packages/core/test/U3.test.ts: bounded software evidence relevant to Valid bounded preapproval does not require another Keyroot phone tap for each run, while missing approval, changed scope, issuer MFA, and fresh consent wait for Bill. Limit: cryptographic authority and replay tests do not establish phone custody or real provider eligibility.",
+    "owner": "Bill"
+  },
+  "R29": {
+    "status": "pending-physical",
+    "evidence": "packages/core/test/U3.test.ts: bounded software evidence relevant to Bill can cancel optional future mutations in a standing approval without undoing completed revocation or separately authorized containment. Limit: cryptographic authority and replay tests do not establish phone custody or real provider eligibility.",
+    "owner": "Bill"
+  },
+  "R30": {
+    "status": "pending-account",
+    "evidence": "packages/core/test/reconciliation.test.ts: bounded software evidence relevant to Keyroot serializes changes to one credential lineage and reconciles an interrupted or ambiguous issuer action before retrying it. Limit: reconciliation uses fixtures; real issuer ambiguous actions need independent verification.",
+    "owner": "Bill"
+  },
+  "R31": {
+    "status": "pending-account",
+    "evidence": "packages/core/test/reconciliation.test.ts: bounded software evidence relevant to Each change exposes a stable operation reference and resumable progress with separate outcomes for creation, delivery, adoption, issuer revocation, and observed issuer rejection. Limit: reconciliation uses fixtures; real issuer ambiguous actions need independent verification.",
+    "owner": "Bill"
+  },
+  "R32": {
+    "status": "pending-account",
+    "evidence": "packages/core/test/engine.test.ts: bounded software evidence relevant to An overlap-capable routine change creates and validates the replacement before publishing it to mapped consumers. Limit: synthetic issuer and consumer receipts cannot establish real adoption or revocation.",
+    "owner": "Bill"
+  },
+  "R33": {
+    "status": "pending-account",
+    "evidence": "packages/core/test/engine.test.ts: bounded software evidence relevant to Delivery accepted, direct use by a named deployment/process/job, and inferred or unknown adoption are distinct receipt classes. Limit: synthetic issuer and consumer receipts cannot establish real adoption or revocation.",
+    "owner": "Bill"
+  },
+  "R34": {
+    "status": "pending-account",
+    "evidence": "packages/core/test/engine.test.ts: bounded software evidence relevant to A consumer receipt identifies the generation, consumer revision or run, observation time, proof method, and limitations. Limit: synthetic issuer and consumer receipts cannot establish real adoption or revocation.",
+    "owner": "Bill"
+  },
+  "R35": {
+    "status": "pending-account",
+    "evidence": "packages/core/test/engine.test.ts: bounded software evidence relevant to A generic health check, cached connection, queued job, quiet old key, or possible fallback never alone proves the named consumer adopted the new generation. Limit: synthetic issuer and consumer receipts cannot establish real adoption or revocation.",
+    "owner": "Bill"
+  },
+  "R36": {
+    "status": "pending-account",
+    "evidence": "packages/core/test/engine.test.ts: bounded software evidence relevant to Ordinary revocation requires the declared adoption-evidence threshold for each mapped consumer or Bill's informed override. Limit: synthetic issuer and consumer receipts cannot establish real adoption or revocation.",
+    "owner": "Bill"
+  },
+  "R37": {
+    "status": "pending-account",
+    "evidence": "packages/core/test/engine.test.ts: bounded software evidence relevant to A consumer without direct adoption proof uses an agreed maintenance or test window and remains labeled uncertain. Limit: synthetic issuer and consumer receipts cannot establish real adoption or revocation.",
+    "owner": "Bill"
+  },
+  "R38": {
+    "status": "pending-account",
+    "evidence": "packages/core/test/engine.test.ts: bounded software evidence relevant to If a consumer is offline or fails, Keyroot holds ordinary revocation where overlap permits and reports the affected consumer. Limit: synthetic issuer and consumer receipts cannot establish real adoption or revocation.",
+    "owner": "Bill"
+  },
+  "R39": {
+    "status": "pending-account",
+    "evidence": "packages/core/test/engine.test.ts: bounded software evidence relevant to Keyroot holds ordinary revocation and flags unresolved use when issuer telemetry shows old-generation activity after mapped cutover, without treating absent telemetry as clearance or overriding separately authorized hard deadlines or incident containment. Limit: synthetic issuer and consumer receipts cannot establish real adoption or revocation.",
+    "owner": "Bill"
+  },
+  "R40": {
+    "status": "pending-account",
+    "evidence": "packages/core/test/engine.test.ts: bounded software evidence relevant to Every operation declares its deadline outcome before execution. Limit: synthetic issuer and consumer receipts cannot establish real adoption or revocation.",
+    "owner": "Bill"
+  },
+  "R41": {
+    "status": "pending-account",
+    "evidence": "packages/core/test/engine.test.ts: bounded software evidence relevant to A routine review deadline stops further optional change, retains a still-valid old value if needed, and reports partial or overdue exposure for Bill's decision. Limit: synthetic issuer and consumer receipts cannot establish real adoption or revocation.",
+    "owner": "Bill"
+  },
+  "R42": {
+    "status": "pending-account",
+    "evidence": "packages/core/test/engine.test.ts: bounded software evidence relevant to A hard revoke or expiry deadline is allowed only for a concrete issuer-supported action and separately preauthorized outage consequence. Limit: synthetic issuer and consumer receipts cannot establish real adoption or revocation.",
+    "owner": "Bill"
+  },
+  "R43": {
+    "status": "pending-account",
+    "evidence": "packages/core/test/incident.test.ts: bounded software evidence relevant to A single-key issuer requires an explicitly acknowledged outage and recovery path before replacement. Limit: outage and issuer outcomes require real account-specific capability and probe evidence.",
+    "owner": "Bill"
+  },
+  "R44": {
+    "status": "pending-account",
+    "evidence": "packages/core/test/incident.test.ts: bounded software evidence relevant to Keyroot regularly checks current credential validity with issuer-safe methods and alerts Bill with an emergency replacement option on verified unexpected revocation. Limit: outage and issuer outcomes require real account-specific capability and probe evidence.",
+    "owner": "Bill"
+  },
+  "R45": {
+    "status": "pending-account",
+    "evidence": "packages/core/test/incident.test.ts: bounded software evidence relevant to Keyroot reports issuer control-plane revocation separately from data-plane rejection, including any documented propagation limit. Limit: outage and issuer outcomes require real account-specific capability and probe evidence.",
+    "owner": "Bill"
+  },
+  "R46": {
+    "status": "pending-account",
+    "evidence": "packages/core/test/incident.test.ts: bounded software evidence relevant to Old-generation outcome is confirmed revoked on issuer-safe revocation or authentication-rejection evidence, confirmed active on an accepted old-key probe, and unverified on timeout, rate limit, scope error, or unsupported check. Limit: outage and issuer outcomes require real account-specific capability and probe evidence.",
+    "owner": "Bill"
+  },
+  "R47": {
+    "status": "pending-account",
+    "evidence": "packages/core/test/adapters-openai.test.ts: bounded software evidence relevant to Raw values leave the store only for issuer action or authorized mapped delivery, never for owner-operation responses, model context, logs, recordings, records, or reports. Limit: redaction assertions use synthetic values; operational surfaces require final audit.",
+    "owner": "Bill"
+  },
+  "R48": {
+    "status": "pending-account",
+    "evidence": "packages/core/test/oauth.test.ts: bounded software evidence relevant to The inventory distinguishes OAuth app secrets, access tokens, refresh-token families, and user grants without treating them as interchangeable keys. Limit: synthetic OAuth state and callback tests do not validate live grants or issuer behavior.",
+    "owner": "Bill"
+  },
+  "R49": {
+    "status": "pending-account",
+    "evidence": "packages/core/test/oauth.test.ts: bounded software evidence relevant to Issuer or native client behavior owns routine refresh for production and third-party clients while Keyroot tracks expiry and coordinates required reauthorization. Limit: synthetic OAuth state and callback tests do not validate live grants or issuer behavior.",
+    "owner": "Bill"
+  },
+  "R50": {
+    "status": "pending-account",
+    "evidence": "packages/core/test/oauth.test.ts: bounded software evidence relevant to Only a specifically Keyroot-owned local grant may use one fenced refresh owner, with stale restored families reconciled or reconsented before use. Limit: synthetic OAuth state and callback tests do not validate live grants or issuer behavior.",
+    "owner": "Bill"
+  },
+  "R51": {
+    "status": "pending-account",
+    "evidence": "packages/core/test/oauth.test.ts: bounded software evidence relevant to Emergency OAuth grant containment revokes the grant before reconsent and records issuer support and residual access-token lifetime before declaring containment. Limit: synthetic OAuth state and callback tests do not validate live grants or issuer behavior.",
+    "owner": "Bill"
+  },
+  "R52": {
+    "status": "pending-account",
+    "evidence": "packages/core/test/native-sessions.test.ts: bounded software evidence relevant to Claude Code and Codex retain native subscription sign-in without Keyroot key-helper or provider-login substitution. Limit: native-client capabilities and telemetry vary by actual platform and account.",
+    "owner": "Bill"
+  },
+  "R53": {
+    "status": "pending-account",
+    "evidence": "packages/core/test/native-sessions.test.ts: bounded software evidence relevant to Keyroot uses each native client's supported OS credential-store path for subscription material where available. Limit: native-client capabilities and telemetry vary by actual platform and account.",
+    "owner": "Bill"
+  },
+  "R54": {
+    "status": "pending-account",
+    "evidence": "packages/core/test/native-sessions.test.ts: bounded software evidence relevant to Keyroot flags subscription material it detects in plaintext files and labels unsupported secure-storage coverage. Limit: native-client capabilities and telemetry vary by actual platform and account.",
+    "owner": "Bill"
+  },
+  "R55": {
+    "status": "pending-account",
+    "evidence": "packages/core/test/native-sessions.test.ts: bounded software evidence relevant to Keyroot offers subscription sign-out only through supported provider or client capabilities and reports unsupported remote sign-out. Limit: native-client capabilities and telemetry vary by actual platform and account.",
+    "owner": "Bill"
+  },
+  "R56": {
+    "status": "pending-account",
+    "evidence": "packages/core/test/native-sessions.test.ts: bounded software evidence relevant to Keyroot alerts Bill to new-place subscription use only where session telemetry exists, with unavailable telemetry labeled unknown. Limit: native-client capabilities and telemetry vary by actual platform and account.",
+    "owner": "Bill"
+  },
+  "R57": {
+    "status": "pending-account",
+    "evidence": "packages/core/test/recipes.test.ts: bounded software evidence relevant to Credential creation and consumer updates use an issuer API first, an admitted dashboard procedure next, and guided execution when neither is safe or available. Limit: route selection uses fixtures; actual provider/account capabilities remain unknown.",
+    "owner": "Bill"
+  },
+  "R58": {
+    "status": "pending-physical",
+    "evidence": "packages/core/test/recipes.test.ts: bounded software evidence relevant to A dashboard worker is isolated from store administration, host files, and other issuer sessions during use, with its profile sealed between runs. Limit: synthetic mediation does not prove browser isolation, secret-safe observations or account admission.",
+    "owner": "Bill"
+  },
+  "R59": {
+    "status": "pending-physical",
+    "evidence": "packages/core/test/recipes.test.ts: bounded software evidence relevant to Dashboard session or broad admin-token authority is reported as account-level blast radius unless issuer scope and enforceable mediation narrow it. Limit: synthetic mediation does not prove browser isolation, secret-safe observations or account admission.",
+    "owner": "Bill"
+  },
+  "R60": {
+    "status": "pending-physical",
+    "evidence": "packages/core/test/recipes.test.ts: bounded software evidence relevant to Browser learning produces a proposed versioned recipe rather than executable authority. Limit: synthetic mediation does not prove browser isolation, secret-safe observations or account admission.",
+    "owner": "Bill"
+  },
+  "R61": {
+    "status": "pending-physical",
+    "evidence": "packages/core/test/recipes.test.ts: bounded software evidence relevant to Unattended reuse requires a validated procedure, one-time owner admission, pinned version, and drift check. Limit: synthetic mediation does not prove browser isolation, secret-safe observations or account admission.",
+    "owner": "Bill"
+  },
+  "R62": {
+    "status": "pending-physical",
+    "evidence": "packages/core/test/recipes.test.ts: bounded software evidence relevant to A model sees only a proven sanitized, bounded observation channel; code handles secret capture and allowed actions without exposing values to the model. Limit: synthetic mediation does not prove browser isolation, secret-safe observations or account admission.",
+    "owner": "Bill"
+  },
+  "R63": {
+    "status": "pending-physical",
+    "evidence": "packages/core/test/recipes.test.ts: bounded software evidence relevant to Vendor pages, support content, and stored prompts are untrusted inputs and cannot change the admitted action scope. Limit: synthetic mediation does not prove browser isolation, secret-safe observations or account admission.",
+    "owner": "Bill"
+  },
+  "R64": {
+    "status": "pending-physical",
+    "evidence": "packages/core/test/recipes.test.ts: bounded software evidence relevant to Unexpected layout, account, privilege, destination, secret-bearing observation, or MFA requirement pauses unattended action for guided handling. Limit: synthetic mediation does not prove browser isolation, secret-safe observations or account admission.",
+    "owner": "Bill"
+  },
+  "R65": {
+    "status": "pending-physical",
+    "evidence": "packages/core/test/recipes.test.ts: bounded software evidence relevant to A failed or changed recipe stays guided until re-admitted, and Bill may set any vendor to guided-only. Limit: synthetic mediation does not prove browser isolation, secret-safe observations or account admission.",
+    "owner": "Bill"
+  },
+  "R66": {
+    "status": "pending-physical",
+    "evidence": "packages/core/test/recipes.test.ts: bounded software evidence relevant to Hosted-model disclosure for a dashboard procedure requires evaluation before that procedure is enabled. Limit: synthetic mediation does not prove browser isolation, secret-safe observations or account admission.",
+    "owner": "Bill"
+  },
+  "R67": {
+    "status": "pending-account",
+    "evidence": "packages/core/test/incident.test.ts: bounded software evidence relevant to Bill may select individual credentials or a vendor/platform scope for emergency action and approve the resulting finite set. Limit: synthetic incident operations do not establish live containment.",
+    "owner": "Bill"
+  },
+  "R68": {
+    "status": "pending-account",
+    "evidence": "packages/core/test/incident.test.ts: bounded software evidence relevant to Emergency policy distinguishes continuity-first replacement from revoke-first outage and never replays a known leaked generation for continuity. Limit: synthetic incident operations do not establish live containment.",
+    "owner": "Bill"
+  },
+  "R69": {
+    "status": "pending-account",
+    "evidence": "packages/core/test/incident.test.ts: bounded software evidence relevant to A compromised consumer destination is quarantined from replacement delivery until its trust is restored or Bill explicitly accepts the residual risk. Limit: synthetic incident operations do not establish live containment.",
+    "owner": "Bill"
+  },
+  "R70": {
+    "status": "pending-account",
+    "evidence": "packages/core/test/incident.test.ts: bounded software evidence relevant to If a routine operation becomes an incident, only separately authorized containment runs while unapproved risk changes wait for Bill. Limit: synthetic incident operations do not establish live containment.",
+    "owner": "Bill"
+  },
+  "R71": {
+    "status": "pending-account",
+    "evidence": "packages/core/test/incident.test.ts: bounded software evidence relevant to Incident reporting separates containment confirmed or unconfirmed, restored or affected service, and action required, with detailed receipts available. Limit: synthetic incident operations do not establish live containment.",
+    "owner": "Bill"
+  },
+  "R72": {
+    "status": "pending-physical",
+    "evidence": "tests/integration/consumer-delivery.test.ts: bounded software evidence relevant to On box outage, local delivery controls stop managed processes still holding fetched material after Bill's 15–30 minute grace or earlier issuer expiry; unmanaged copies and platform consumers follow their own validity. Limit: managed process fixtures do not prove four-machine outage behavior or retract unmanaged copies.",
+    "owner": "Bill"
+  },
+  "R73": {
+    "status": "pending-physical",
+    "evidence": "tests/integration/recovery.test.ts: bounded software evidence relevant to Recovery from permanent box loss requires a tested encrypted backup, independent decryption material, independent inventory, and clean-device issuer-native access even when the normal phone is unavailable. Limit: synthetic age and WebAuthn cannot prove independent hardware, owner-store backup or issuer recovery.",
+    "owner": "Bill"
+  },
+  "R74": {
+    "status": "pending-physical",
+    "evidence": "tests/integration/recovery.test.ts: bounded software evidence relevant to The enrolled YubiKey may approve emergencies when the phone is unavailable but is not itself vault or issuer-account recovery. Limit: synthetic age and WebAuthn cannot prove independent hardware, owner-store backup or issuer recovery.",
+    "owner": "Bill"
+  },
+  "R75": {
+    "status": "pending-physical",
+    "evidence": "tests/integration/recovery.test.ts: bounded software evidence relevant to Suspected root compromise requires clean issuer-admin recovery, replacement of compromised management authority, supported session invalidation, and a rebuilt trusted controller before receiving new secrets. Limit: synthetic age and WebAuthn cannot prove independent hardware, owner-store backup or issuer recovery.",
+    "owner": "Bill"
+  },
+  "R76": {
+    "status": "pending-physical",
+    "evidence": "tests/integration/recovery.test.ts: bounded software evidence relevant to Recovery does not reactivate stale approvals, privileged sessions, or OAuth refresh families and reports authority that cannot be invalidated. Limit: synthetic age and WebAuthn cannot prove independent hardware, owner-store backup or issuer recovery.",
+    "owner": "Bill"
+  },
+  "R77": {
+    "status": "pending-physical",
+    "evidence": "packages/core/test/metrics.test.ts: bounded software evidence relevant to The five-credential emergency ambition is under five minutes of all Bill's active time from selection through final report, including approvals, MFA, guided steps, troubleshooting, and review. Limit: measurement logic is exercised; no owner-time baseline or real incident has been measured.",
+    "owner": "Bill"
+  },
+  "R78": {
+    "status": "pending-physical",
+    "evidence": "packages/core/test/metrics.test.ts: bounded software evidence relevant to Keyroot reports unsupported inventory coverage and measures unattended wait, containment elapsed time, and restoration elapsed time separately from owner time. Limit: measurement logic is exercised; no owner-time baseline or real incident has been measured.",
+    "owner": "Bill"
+  },
+  "R79": {
+    "status": "pending-physical",
+    "evidence": "packages/core/test/metrics.test.ts: bounded software evidence relevant to Added coordination must reduce total owner handling and repair time against an existing-store-plus-guided-checklist baseline on the same credential set, with license and maintenance costs visible. Limit: measurement logic is exercised; no owner-time baseline or real incident has been measured.",
+    "owner": "Bill"
+  },
+  "R80": {
+    "status": "pending-physical",
+    "evidence": "packages/core/test/inventory.test.ts: bounded software evidence relevant to The inventory names Keyroot's store root and recovery material, issuer-admin credentials, platform push tokens, approval identities, and dashboard sessions with each authority's owner and recovery dependency. Limit: synthetic inventory does not establish actual authority ownership or recovery dependencies.",
+    "owner": "Bill"
+  },
+  "R81": {
+    "status": "pending-physical",
+    "evidence": "tests/browser/review-component.test.ts: bounded software evidence relevant to The review interface follows Bill's selected warm editorial layout and offers both light and dark appearances with equivalent information and actions. Limit: component rendering does not prove full visual and browser journeys.",
+    "owner": "Bill"
+  },
+  "R82": {
+    "status": "automated",
+    "evidence": "tests/browser/theme.test.ts: bounded software evidence relevant to On first visit the interface follows the system appearance and persists a later explicit theme choice across visits. Limit: component and pure-state checks cover theme persistence and state isolation; full browser journey remains a separate gate.",
+    "owner": "project"
+  },
+  "R83": {
+    "status": "automated",
+    "evidence": "tests/browser/theme.test.ts: bounded software evidence relevant to Changing appearance preserves the current batch, approval draft, selected credential, and operation progress without resetting the workflow. Limit: component and pure-state checks cover theme persistence and state isolation; full browser journey remains a separate gate.",
+    "owner": "project"
+  },
+  "AE1": {
+    "status": "pending-physical",
+    "evidence": "packages/core/test/adapters-openbao.test.ts, packages/core/test/discovery.test.ts: bounded checks for Given the dedicated box and reused store, when a read-only scan finds a named key, an unreadable CI secret, and an unplaced local value, then the map records the key's typed lineage, generation, consumer, and evidence source, shows both gaps, and revokes nothing. Limit: composite scenario and external account/device outcomes are not established by these partial tests.",
+    "requirements": [
+      "R1",
+      "R2",
+      "R3",
+      "R4",
+      "R5",
+      "R6",
+      "R7"
+    ],
+    "owner": "Bill"
+  },
+  "AE2": {
+    "status": "pending-physical",
+    "evidence": "packages/core/test/federation.test.ts, packages/core/test/oauth.test.ts: bounded checks for Given an eligible existing CI issuer but a leftover static key with precedence, when federation is proposed, then retirement waits for a demonstrated identity-only run without the fallback or a Keyroot production dependency. Limit: composite scenario and external account/device outcomes are not established by these partial tests.",
+    "requirements": [
+      "R8",
+      "R9",
+      "R10"
+    ],
+    "owner": "Bill"
+  },
+  "AE3": {
+    "status": "pending-account",
+    "evidence": "packages/core/test/capability.test.ts: bounded checks for Given an issuer API documented elsewhere but unavailable to Bill's account and a consumer without an update integration, when capabilities are checked, then neither is called automated and the consumer remains assisted or inventory-only with the limit visible. Limit: composite scenario and external account/device outcomes are not established by these partial tests.",
+    "requirements": [
+      "R11",
+      "R12",
+      "R13"
+    ],
+    "owner": "Bill"
+  },
+  "AE4": {
+    "status": "pending-account",
+    "evidence": "packages/core/test/inventory.test.ts, packages/core/test/incident.test.ts: bounded checks for Given two external consumers, four dev machines, and limited issuer slots, when allocation is planned, then external keys are separate and one overlap slot stays free where possible, dev machines share by default, Bill can choose per-device keys, and Keyroot tries consolidation before asking approval for a non-overlap outage. Limit: composite scenario and external account/device outcomes are not established by these partial tests.",
+    "requirements": [
+      "R14",
+      "R15",
+      "R16",
+      "R43"
+    ],
+    "owner": "Bill"
+  },
+  "AE5": {
+    "status": "pending-physical",
+    "evidence": "packages/core/test/wrapper.test.ts, tests/integration/http-auth.test.ts, packages/core/test/recipes.test.ts: bounded checks for Given a dev wrapper mapped to one credential and a connector claiming narrow authority, when the wrapper requests another value, the connector tries an unrelated admin action, and a tailnet member requests owner administration without Bill's signature, then delivery and administration refuse the unauthorized requests while the trusted executor denies the unrelated action or discloses its broad account authority. Limit: composite scenario and external account/device outcomes are not established by these partial tests.",
+    "requirements": [
+      "R17",
+      "R18",
+      "R19",
+      "R20",
+      "R21",
+      "R59"
+    ],
+    "owner": "Bill"
+  },
+  "AE6": {
+    "status": "automated",
+    "evidence": "packages/core/test/schedule.test.ts: bounded checks for Given a 120-day interval with earlier issuer expiry, when Bill saves it, then Keyroot warns above 90 days and forecasts the earlier owner prompt. Limit: composite scenario and external account/device outcomes are not established by these partial tests.",
+    "requirements": [
+      "R22",
+      "R23"
+    ],
+    "owner": "project"
+  },
+  "AE7": {
+    "status": "pending-physical",
+    "evidence": "packages/core/test/U3.test.ts: bounded checks for Given a signed weekly approval listing finite rotations, when one approved generation succeeds, a consumer map changes, and another instance expires, then the unchanged instance runs once without another Keyroot tap while changed and expired instances wait for new approval. Limit: composite scenario and external account/device outcomes are not established by these partial tests.",
+    "requirements": [
+      "R24",
+      "R25",
+      "R26",
+      "R27",
+      "R28"
+    ],
+    "owner": "Bill"
+  },
+  "AE8": {
+    "status": "pending-physical",
+    "evidence": "packages/core/test/U3.test.ts, packages/core/test/reconciliation.test.ts: bounded checks for Given an ambiguous create followed by a crash and restored backup, when work resumes, then the stable operation reference shows resumable partial progress, outstanding approvals are invalid, issuer state is reconciled, and no duplicate creation starts on the old authority. Limit: composite scenario and external account/device outcomes are not established by these partial tests.",
+    "requirements": [
+      "R26",
+      "R30",
+      "R31"
+    ],
+    "owner": "Bill"
+  },
+  "AE9": {
+    "status": "pending-physical",
+    "evidence": "packages/core/test/U3.test.ts, packages/core/test/incident.test.ts: bounded checks for Given Bill cancels a routine window while separately authorized incident containment is pending, when cancellation takes effect, then optional new mutation stops while completed revocation remains final and authorized containment may proceed. Limit: composite scenario and external account/device outcomes are not established by these partial tests.",
+    "requirements": [
+      "R29",
+      "R70"
+    ],
+    "owner": "Bill"
+  },
+  "AE10": {
+    "status": "pending-account",
+    "evidence": "packages/core/test/engine.test.ts: bounded checks for Given a valid new key delivered to Vercel and GitHub Actions, when a fresh Vercel deployment proves its generation but a queued Actions job and old pooled connection pass generic health checks, then receipts record generation, run, time, and limits, distinguish direct use from inference, and ordinary revoke waits for the declared threshold or Bill's informed override. Limit: composite scenario and external account/device outcomes are not established by these partial tests.",
+    "requirements": [
+      "R32",
+      "R33",
+      "R34",
+      "R35",
+      "R36"
+    ],
+    "owner": "Bill"
+  },
+  "AE11": {
+    "status": "pending-account",
+    "evidence": "packages/core/test/engine.test.ts: bounded checks for Given an offline consumer with no direct adoption proof, when its maintenance window passes without a successful test, then its state remains uncertain and ordinary revocation is held with the affected consumer named. Limit: composite scenario and external account/device outcomes are not established by these partial tests.",
+    "requirements": [
+      "R37",
+      "R38"
+    ],
+    "owner": "Bill"
+  },
+  "AE12": {
+    "status": "pending-account",
+    "evidence": "packages/core/test/engine.test.ts: bounded checks for Given every mapped consumer proves new-generation use, when issuer telemetry reports later old-generation activity, then ordinary revoke holds and Bill sees unresolved consumer use or possible misuse; a separately authorized hard deadline or incident policy still governs its own action. Limit: composite scenario and external account/device outcomes are not established by these partial tests.",
+    "requirements": [
+      "R39"
+    ],
+    "owner": "Bill"
+  },
+  "AE13": {
+    "status": "pending-account",
+    "evidence": "packages/core/test/engine.test.ts, packages/core/test/incident.test.ts: bounded checks for Given an offline consumer at a routine review deadline, when Bill is unavailable, then the still-valid old key and overdue exposure are reported without an invented outage; a preauthorized issuer-supported hard deadline or single-key replacement follows its acknowledged outage path. Limit: composite scenario and external account/device outcomes are not established by these partial tests.",
+    "requirements": [
+      "R40",
+      "R41",
+      "R42",
+      "R43"
+    ],
+    "owner": "Bill"
+  },
+  "AE14": {
+    "status": "pending-account",
+    "evidence": "packages/core/test/incident.test.ts: bounded checks for Given a current key is revoked outside Keyroot, when an issuer-safe check verifies rejection, then Bill receives an alert and emergency replacement option; a network failure alone leaves validity unverified. Limit: composite scenario and external account/device outcomes are not established by these partial tests.",
+    "requirements": [
+      "R44"
+    ],
+    "owner": "Bill"
+  },
+  "AE15": {
+    "status": "pending-account",
+    "evidence": "packages/core/test/incident.test.ts, packages/core/test/adapters-openai.test.ts: bounded checks for Given a dashboard revoke appears successful, when an old-key probe times out or returns a scope error, then rejection remains unverified; issuer-specific authentication rejection or an accepted old-key probe receives its distinct outcome without exposing the value in records. Limit: composite scenario and external account/device outcomes are not established by these partial tests.",
+    "requirements": [
+      "R45",
+      "R46",
+      "R47"
+    ],
+    "owner": "Bill"
+  },
+  "AE16": {
+    "status": "pending-account",
+    "evidence": "packages/core/test/oauth.test.ts: bounded checks for Given a production OAuth client refreshes natively and a stale Keyroot-owned local-grant backup is restored, when the box returns, then production renewal remains independent and the typed local family is reconciled or reconsented before refresh. Limit: composite scenario and external account/device outcomes are not established by these partial tests.",
+    "requirements": [
+      "R48",
+      "R49",
+      "R50"
+    ],
+    "owner": "Bill"
+  },
+  "AE17": {
+    "status": "pending-account",
+    "evidence": "packages/core/test/oauth.test.ts: bounded checks for Given an emergency OAuth grant revoke leaves issued access tokens temporarily valid, when Bill reconsents, then the report records residual lifetime rather than declaring full containment early. Limit: composite scenario and external account/device outcomes are not established by these partial tests.",
+    "requirements": [
+      "R51"
+    ],
+    "owner": "Bill"
+  },
+  "AE18": {
+    "status": "pending-account",
+    "evidence": "packages/core/test/native-sessions.test.ts: bounded checks for Given one native subscription client supports the OS credential store and another platform exposes only a plaintext file, when Keyroot checks storage, then the first keeps native sign-in through its supported secure path and the second is flagged with unsupported secure-storage coverage. Limit: composite scenario and external account/device outcomes are not established by these partial tests.",
+    "requirements": [
+      "R52",
+      "R53",
+      "R54"
+    ],
+    "owner": "Bill"
+  },
+  "AE19": {
+    "status": "pending-account",
+    "evidence": "packages/core/test/native-sessions.test.ts: bounded checks for Given Bill requests sign-out but the provider lacks remote-session revocation, when Keyroot handles the request, then it reports that limitation instead of claiming all sessions ended. Limit: composite scenario and external account/device outcomes are not established by these partial tests.",
+    "requirements": [
+      "R55"
+    ],
+    "owner": "Bill"
+  },
+  "AE20": {
+    "status": "pending-account",
+    "evidence": "packages/core/test/native-sessions.test.ts: bounded checks for Given one subscription provider exposes a new-place session event and another exposes no session telemetry, when Keyroot checks them, then Bill receives the supported alert and sees the other provider's visibility as unknown. Limit: composite scenario and external account/device outcomes are not established by these partial tests.",
+    "requirements": [
+      "R56"
+    ],
+    "owner": "Bill"
+  },
+  "AE21": {
+    "status": "pending-physical",
+    "evidence": "packages/core/test/recipes.test.ts: bounded checks for Given no issuer API and an admitted dashboard recipe with a proven sanitized observation channel, when it runs, then only its pinned version reaches the isolated worker, secret capture stays in code, untrusted page text cannot widen actions, and hosted-model disclosure has been evaluated if used. Limit: composite scenario and external account/device outcomes are not established by these partial tests.",
+    "requirements": [
+      "R57",
+      "R58",
+      "R61",
+      "R62",
+      "R63",
+      "R66"
+    ],
+    "owner": "Bill"
+  },
+  "AE22": {
+    "status": "pending-physical",
+    "evidence": "packages/core/test/recipes.test.ts: bounded checks for Given an admitted recipe encounters a changed destination or passkey prompt, when the drift check detects it, then unattended action pauses, its guided trace is only a proposed versioned recipe, and unattended reuse waits for Bill's re-admission. Limit: composite scenario and external account/device outcomes are not established by these partial tests.",
+    "requirements": [
+      "R60",
+      "R64",
+      "R65"
+    ],
+    "owner": "Bill"
+  },
+  "AE23": {
+    "status": "pending-account",
+    "evidence": "packages/core/test/incident.test.ts: bounded checks for Given Bill selects five leaked credentials including a compromised destination, when he approves revoke-first containment, then the finite scope does not replay leaked generations, quarantines that destination, and reports containment, service, and owner action separately. Limit: composite scenario and external account/device outcomes are not established by these partial tests.",
+    "requirements": [
+      "R67",
+      "R68",
+      "R69",
+      "R70",
+      "R71"
+    ],
+    "owner": "Bill"
+  },
+  "AE24": {
+    "status": "pending-physical",
+    "evidence": "tests/integration/consumer-delivery.test.ts: bounded checks for Given the box is offline for 20 minutes, when a managed local process reaches its configured grace or issuer expiry first, then local controls stop it; an unmanaged copy receives no retraction claim. Limit: composite scenario and external account/device outcomes are not established by these partial tests.",
+    "requirements": [
+      "R72"
+    ],
+    "owner": "Bill"
+  },
+  "AE25": {
+    "status": "pending-physical",
+    "evidence": "tests/integration/recovery.test.ts: bounded checks for Given the box and normal phone are lost, when Bill restores from independent materials, then the YubiKey alone is insufficient and stale approvals remain invalid; suspected root compromise instead uses clean issuer administration and a rebuilt controller. Limit: composite scenario and external account/device outcomes are not established by these partial tests.",
+    "requirements": [
+      "R73",
+      "R74",
+      "R75",
+      "R76"
+    ],
+    "owner": "Bill"
+  },
+  "AE26": {
+    "status": "pending-physical",
+    "evidence": "packages/core/test/metrics.test.ts: bounded checks for Given a five-credential incident includes two guided vendors and repeated MFA, when effort is measured, then all Bill's active work counts, unsupported coverage stays visible, and coordinator upkeep is compared with the same-set guided baseline. Limit: composite scenario and external account/device outcomes are not established by these partial tests.",
+    "requirements": [
+      "R77",
+      "R78",
+      "R79"
+    ],
+    "owner": "Bill"
+  },
+  "AE27": {
+    "status": "pending-physical",
+    "evidence": "packages/core/test/inventory.test.ts: bounded checks for Given Keyroot holds store recovery material, an issuer-admin credential, platform push token, approval identity, and dashboard session, when the inventory is reviewed, then each authority has an owner and recovery dependency without exposing its value. Limit: composite scenario and external account/device outcomes are not established by these partial tests.",
+    "requirements": [
+      "R80"
+    ],
+    "owner": "Bill"
+  },
+  "AE28": {
+    "status": "pending-physical",
+    "evidence": "tests/browser/review-component.test.ts, tests/browser/theme.test.ts: bounded checks for Given a first visit in either system appearance and a partly reviewed approval batch, when Bill changes to the other appearance and returns later, then the selected editorial layout and equivalent actions remain, the explicit choice persists, and the batch, selected credential, approval draft, and operation progress are unchanged. Limit: composite scenario and external account/device outcomes are not established by these partial tests.",
+    "requirements": [
+      "R81",
+      "R82",
+      "R83"
+    ],
+    "owner": "Bill"
+  }
+}

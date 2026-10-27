@@ -24,3 +24,4 @@
 - `plans/AGENTS.md` — owns unified requirements and implementation plans, with readiness determined by content.
 - `research/AGENTS.md` — owns preserved inputs, research, reviews and their evidence limits.
 - `design/AGENTS.md` — owns approved visual references, theme specifications and rendered comparison evidence.
+- `operations/AGENTS.md` — owns safe runbooks, provider coverage and requirement traceability.

@@ -47,7 +47,7 @@ export function reviewReducer(state: ReviewState, action: ReviewAction): ReviewS
     case 'reset': return createReviewState(action.review);
   }
 }
-function useAppearance() {
+export function useAppearance() {
   const [appearance] = useState(() => {
     let storedChoice: string | null = null;
     try { if (typeof window !== 'undefined') storedChoice = window.localStorage.getItem(THEME_STORAGE_KEY); } catch { /* Follow system when storage is unavailable. */ }

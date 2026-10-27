@@ -1,45 +1,16 @@
 # Keyroot
 
-## Overview
+Keyroot is an in-progress personal credential lifecycle coordinator for four machines and connected platforms. It maps credential use and coordinates bounded approvals, delivery, adoption evidence, issuer outcomes, incident response and recovery. Native Claude Code and Codex subscription authentication remains native, and production requests and refresh must not depend on the Keyroot box.
 
-Keyroot is a personal credential lifecycle project for four machines and connected platforms. Its goal is to map credential usage, coordinate approved rotations, and show the evidence for each outcome.
+The workspace includes an owner controller and review, a separate phone approval build, lifecycle and recovery machinery, and synthetic integration fixtures. The supplied controller entry point does not wire live provider, store, admission or recovery ports. Real account admission, phone custody, the selected existing store, four-machine behavior, isolation and independent recovery remain unverified. A demo or successful fixture does not establish live readiness. The [1Password pilot profile](docs/operations/onepassword-pilot-proposal.md) is a proposal awaiting confirmation, not an admitted adapter.
 
-## Current status
-
-Phase 2 is under active construction. The local workspace includes inventory and capability contracts, a selected light/dark review preview, and a controller foundation. Full lifecycle integration and live validation remain incomplete.
-
-With Node 24.18+ (24.x) and npm 11+, run:
+With Node 24.18+ in the 24.x series and npm 11+:
 
 ```sh
 npm ci
 npm run dev
 ```
 
-Open `http://127.0.0.1:4173/`. The screen is a labeled synthetic preview; it cannot approve or rotate real credentials. Theme changes preserve the current review draft.
+Open `http://127.0.0.1:4173/` for the synthetic local demo. It uses project-local `runtime/demo-dev`; direct controller/CLI defaults are `~/.keyroot-demo` for demo and `~/.keyroot` for real. Runtime directories cannot change modes. The preview is not a trusted production phone origin. See [operating guidance](docs/operations/README.md), [provider coverage](docs/operations/provider-capabilities.md), [recovery](docs/operations/recovery.md), and the [validation ledger](docs/operations/validation-ledger.md). The [plan](docs/plans/2026-10-25-2356-feat-keyroot-credential-lifecycle-plan.md) defines requirements, final verification and the physical/account gates required before real operations.
 
-## Planned behavior
-
-- Reuse an existing secrets store and build a read-only inventory of credentials, mapped consumers, and coverage gaps.
-- Review bounded changes through phone approval before executing them.
-- Use issuer APIs where available, admitted dashboard procedures where appropriate, and guided steps otherwise.
-- Track consumer adoption and issuer revocation evidence separately, keeping unknown outcomes visible.
-- Provide an owner API and review interface, with incident handling and independent recovery workflows.
-
-These are design goals, not shipped capabilities or verified integrations.
-
-## Design boundaries
-
-- Native Claude Code and Codex subscription authentication stays native.
-- Production requests and credential renewal must not depend on the Keyroot box.
-- Secrets must not enter model context or logs.
-- A copied bearer key cannot be recalled simply by stopping a wrapper; issuer-side revocation is needed to invalidate it.
-
-## Roadmap
-
-1. **Phase 1 — Minimal foundation:** credential and consumer records, access controls, an audit journal, and secrets-store integration.
-2. **Phase 2 — Credential rotation:** develop approved rotation and evidence workflows.
-3. **Phase 3 — Breach watcher:** deferred; no automatic breach-triggered rotation is planned in the current scope.
-
-## License
-
-[MIT](LICENSE).
+[MIT License](LICENSE).

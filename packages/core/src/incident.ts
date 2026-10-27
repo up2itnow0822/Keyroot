@@ -1,7 +1,7 @@
 import { randomUUID } from 'node:crypto';
 import { Journal } from './journal.js';
 import { LifecycleEngine, type LifecycleSnapshot } from './engine.js';
-import { parseCanonicalManifest, type ApprovalManifest } from './manifest.js';
+import { applicableConsumers, parseCanonicalManifest, type ApprovalManifest } from './manifest.js';
 import { assertWiredEngine, initializeScheduleSchema } from './schedule.js';
 import { MutationInterlock, NotificationFailure } from './notifier.js';
 export interface Destination { consumerId: string; destinationId: string }
@@ -62,7 +62,8 @@ export class IncidentCoordinator {
       try {
         const emergencyProofs = proofs[op.operationId];
         const snapshot = await this.engine.run({ grantId, operationId: op.operationId, ...(emergencyProofs ? { emergencyProofs } : {}) });
-        const used = manifest.consumerMap.entries.length > 0 && manifest.consumerMap.entries.every(entry => {
+        const consumers = applicableConsumers(manifest, op);
+        const used = consumers.length > 0 && consumers.every(entry => {
           const delivered = snapshot.receipts.filter(r => r.kind === 'deliver' && r.outcome === 'delivery-accepted' && r.subject.consumerId === entry.consumerId && r.subject.revision === entry.revision && r.subject.consumerMapRevision === manifest.consumerMap.revision && r.subject.generation === op.toGeneration).at(-1);
           return !!delivered && snapshot.receipts.some(r => r.kind === 'consumer-use' && r.outcome === 'direct-use' && r.subject.consumerId === entry.consumerId && r.subject.revision === entry.revision && r.subject.consumerMapRevision === manifest.consumerMap.revision && r.subject.generation === op.toGeneration && r.subject.resourceId === delivered.subject.resourceId && r.observedAt >= delivered.observedAt);
         });
@@ -72,7 +73,7 @@ export class IncidentCoordinator {
         if (error instanceof NotificationFailure) throw error;
           if (typeof error === 'object' && error !== null && 'code' in error && String(error.code).includes('SQLITE')) { this.interlock.journalFailed(op.operationId); throw error; }
         await this.interlock.checkEffectFence();
-        if (!(error instanceof Error) || !/predecessor|Lineage busy|Cancelled or unknown approval|outside validity|Current scope or policy changed|budget exhausted|reconcil/i.test(error.message)) throw error;
+        if (!(error instanceof Error) || !/predecessor|Lineage busy|Cancelled or unknown approval|outside validity|Current scope or policy changed|budget exhausted|reconcil|Fresh emergency assertion required|Emergency continuation authority missing/i.test(error.message)) throw error;
         const prior = this.engine.journal.inspectOperation(op.operationId) ? this.engine.inspect(op.operationId) : undefined;
         result.push({ operationId: op.operationId, containment: prior?.issuer ?? 'unverified', residualTokenValidity: prior?.probe ?? 'unknown', replacement: prior?.replacement ?? 'not-created', serviceRestoration: prior?.replacement === 'stored' ? 'unverified' : 'not-started', ownerAction: ['credential-held', ...(prior?.holds ?? [])] });
       }

@@ -5,7 +5,12 @@ export type GrantType = 'static-key' | 'oauth' | 'workload-identity' | 'native-s
 export interface CredentialLineage { id: Id; issuerId: Id; accountId: Id; credentialType: string; grantType: GrantType; grantId?: Id; }
 export interface CredentialGeneration { id: Id; lineageId: Id; version: string; status: 'active' | 'retired' | 'unknown'; }
 export interface Consumer { id: Id; name: string; kind: 'external' | 'dev-machine' | 'production' | 'ci' | 'other'; }
-export interface ConsumerBinding { id: Id; lineageId: Id; consumerId: Id; generationId?: Id; association: Association; }
+export interface ConsumerBinding {
+  id: Id; lineageId: Id; consumerId: Id; generationId?: Id;
+  /** Exact delivery target and workload revision; omitted metadata remains unknown. */
+  destinationId?: Id; consumerRevision?: string;
+  association: Association;
+}
 export interface CoverageGap { kind: 'unplaced' | 'inaccessible' | 'unscanned'; source: string; detail?: string; }
 export interface ConsumerMap { revision: number; bindings: ConsumerBinding[]; gaps: CoverageGap[]; }
 export type DevAllocation = 'shared' | 'per-device';

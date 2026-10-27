@@ -8,7 +8,7 @@
 
 ## Local Contracts
 - Local development binds to loopback. Real actions require core authority checks.
-- Review and static Sites builds cannot grant approval or act as the trusted production phone origin.
+- The owner review and static Sites build cannot grant approval or act as the trusted production phone origin.
 - Never return secret material in owner responses.
 
 ## Work Guidance

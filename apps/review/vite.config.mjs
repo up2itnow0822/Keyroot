@@ -11,7 +11,7 @@ export default defineConfig({
   server: {
     host: "127.0.0.1",
     allowedHosts: ["terminal.local", "localhost"],
-    proxy: { "/api": "http://127.0.0.1:9047" },
+    proxy: { "/api": { target: "http://127.0.0.1:9047", changeOrigin: true } },
     warmup: {
       clientFiles: ["./src/main.tsx"],
     },
