@@ -9,5 +9,6 @@ function walk(dir) {
 if (!roots[kind]) throw new Error('Unknown test suite');
 const files = roots[kind].flatMap(walk);
 if (files.length === 0) throw new Error(`No ${kind} tests implemented; this gate has not passed.`);
-const result = spawnSync(process.execPath, ['--import', 'tsx', '--test', ...files], { stdio: 'inherit' });
+const env = { ...process.env, TSX_TSCONFIG_PATH: kind === 'browser' ? 'apps/review/tsconfig.json' : 'tsconfig.json' };
+const result = spawnSync(process.execPath, ['--import', 'tsx', '--test', ...files], { stdio: 'inherit', env });
 process.exitCode = result.status ?? 1;

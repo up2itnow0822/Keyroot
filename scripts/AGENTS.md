@@ -12,6 +12,7 @@
 
 ## Work Guidance
 - Keep scripts deterministic and dependency-light.
+- The test runner explicitly selects the frontend bundler TypeScript config for component tests and the Node config for core/integration tests.
 
 ## Verification
 - Root lint and observed script invocations.
