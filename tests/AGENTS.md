@@ -5,7 +5,7 @@
 
 ## Ownership
 - `browser/` owns component contracts; host CUA owns observed browser journeys.
-- `integration/` owns synthetic process, store and complete lifecycle scenarios when implemented.
+- `integration/` owns disposable-service, process and lifecycle scenarios.
 
 ## Local Contracts
 - Component tests do not establish browser behavior, physical custody or live account eligibility.
@@ -17,8 +17,9 @@
 
 ## Verification
 - `npm run test:browser` runs component contracts.
-- `npm run test:integration` requires an implemented integration suite and fails while absent.
+- `npm run test:integration` includes actual Docker/OpenBao protocol checks and requires a running Docker server.
 - Root `design-qa.md` tracks actual browser observations and their limits.
 
 ## Child DOX Index
-- None. This contract owns scenario tests recursively.
+- `integration/AGENTS.md` — disposable services, resource ownership and lifecycle scenarios.
+- `browser/AGENTS.md` — component/theme contracts and browser-evidence limits.
