@@ -1,0 +1,6 @@
+{
+  "extends": "./tsconfig.base.json",
+  "compilerOptions": { "noEmit": true, "allowImportingTsExtensions": true, "lib": ["ES2023", "DOM", "DOM.Iterable"] },
+  "include": ["apps/**/*.ts", "apps/**/*.tsx", "packages/**/*.ts", "tests/**/*.ts"],
+  "exclude": ["**/node_modules", "**/dist", "**/build"]
+}

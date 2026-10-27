@@ -1,0 +1,5 @@
+{
+  "name": "@keyroot/controller", "version": "0.1.0", "private": true, "type": "module",
+  "scripts": { "dev": "tsx watch src/main.ts" },
+  "dependencies": { "@keyroot/core": "0.1.0", "@keyroot/fixtures": "0.1.0" }
+}
