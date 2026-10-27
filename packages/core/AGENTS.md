@@ -26,6 +26,9 @@
 - OAuth metadata owns only explicitly local refresh families; production/third-party refresh stays external. Local recovery observes the original pending intent before fresh authority permits further effects.
 - Native sign-out evidence confirms only the configured local command; remote session invalidation remains separately unverified.
 - Every external action binds its metadata configuration hash, including provider scopes/TTL, probe method and exact store or consumer target. Content-addressed descriptors contain no secrets and must be verified by the phone before signing.
+- Scheduling must use `createScheduledEngine` so notification/journal interlocks run at every effect and continuation. Post-await checks are required; notification retry cannot clear a journal failure without reconciliation.
+- Revoke-first mixed emergency work requires the signed reason and declared outage, then fresh issuer revocation plus old-key rejection before replacement mutation.
+- Recovery archives require maintained encryption and an independently pinned signature key. Imported authority is invalidated; excluded security metadata keeps recovery held.
 
 ## Work Guidance
 - Test public behavior and record proof-first evidence when practical.
@@ -40,4 +43,5 @@
 - `src/discovery/AGENTS.md` — read-only source scanning and coverage provenance.
 - `src/consumers/AGENTS.md` — mapped delivery, atomic files and platform transports.
 - `src/recipes/AGENTS.md` — guided drafts, proposals and recipe admission.
+- `src/recovery/AGENTS.md` — authenticated encrypted metadata and recovery hold.
 - Core retains authority, engine, OAuth/native contracts and all focused tests.
