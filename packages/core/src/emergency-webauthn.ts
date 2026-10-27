@@ -64,8 +64,8 @@ export class EmergencyWebAuthn {
         const jwk = enrollmentPublicKey(input);
         if (publicKeyFingerprint(jwk) !== input.confirmedFingerprint)
             throw new Error('Emergency fingerprint mismatch');
-        new ApprovalService(this.journal, { mode: 'synthetic' }).bootstrapApprover({ signerId: input.signerId, role: 'emergency', publicKey: jwk, localBootstrap: input.localBootstrap, confirmedFingerprint: input.confirmedFingerprint });
         this.journal.transaction(db => {
+            new ApprovalService(this.journal, { mode: 'synthetic' }).bootstrapApproverInTransaction(db, { signerId: input.signerId, role: 'emergency', publicKey: jwk, localBootstrap: input.localBootstrap, confirmedFingerprint: input.confirmedFingerprint });
             db.prepare('INSERT INTO emergency_credential VALUES(?,?,?,?,?,?)').run(input.signerId, input.credentialId, Buffer.from(input.cosePublicKey).toString('base64url'), 0, input.rpId, input.origin);
             this.journal.audit(db, 'emergency-local-bootstrap', null, input.signerId);
         });

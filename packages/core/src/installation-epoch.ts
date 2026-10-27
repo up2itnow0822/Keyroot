@@ -12,6 +12,7 @@ export interface InstallationEpochStore {
 }
 export interface RecoveryObservations {
     predecessor: 'quiesced' | 'management-authority-invalidated';
+    observedPredecessor: EpochRecord;
     evidenceHash: string;
     inFlightOutcomes: 'reconciled';
 }
@@ -53,10 +54,15 @@ export class InstallationEpoch {
             throw new Error('Independent predecessor and reconciliation evidence required');
         this.held = true;
         this.journal.setRecoveryHold();
+        const observed = { ...observations.observedPredecessor };
+        if (!Number.isSafeInteger(observed.version) || observed.version < 1 || !observed.installationId || !observed.ownerId)
+            throw new Error('Exact observed predecessor required');
+        if (this.journal.read(db => db.prepare("SELECT 1 FROM intent WHERE state!='observed'").get()))
+            throw new Error('Unreconciled external effects');
         const current = await this.store.read();
-        if (!current)
-            throw new Error('Missing predecessor epoch requires explicit store recovery');
-        const next = await this.store.compareAndSet(current.version, { installationId: this.installationId, ownerId: this.ownerId });
+        if (!current || current.version !== observed.version || current.installationId !== observed.installationId || current.ownerId !== observed.ownerId)
+            throw new Error('Observed predecessor changed; fresh recovery evidence required');
+        const next = await this.store.compareAndSet(observed.version, { installationId: this.installationId, ownerId: this.ownerId });
         if (!next || next.installationId !== this.installationId || next.ownerId !== this.ownerId)
             throw new Error('Recovery epoch raced');
         this.journal.releaseRecoveryHold();

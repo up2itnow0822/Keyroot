@@ -19,6 +19,12 @@
 - Installation epoch checks fence future dispatch but cannot cancel an upstream request or guarantee exactly-once execution.
 - Store adapters expose a mapped, pinned-version consumer port. Reconciliation requires stored operation/issuer/account binding; existence alone is insufficient.
 - Current issuer transport is synthetic only. Live admission and complete engine integration remain pending; disposable OpenBao protocol checks do not admit the owner's store.
+- Receipt append records evidence only. Explicit action-specific resolution requires complete bound subjects; historical unknowns remain and require an explicit reconciliation marker.
+- Recovery observations identify the exact predecessor installation, owner and store version. Stale observations cannot take over a newer epoch.
+- Authority uses a trusted constructor clock after asynchronous fences; request timestamps cannot keep expired authority alive.
+- The lifecycle engine persists complete stage outcomes, separates named direct use from delivery and probes, and holds uncertainty through timeout or restart. Abort signals do not prove upstream cancellation.
+- OAuth metadata owns only explicitly local refresh families; production/third-party refresh stays external. Local recovery observes the original pending intent before fresh authority permits further effects.
+- Native sign-out evidence confirms only the configured local command; remote session invalidation remains separately unverified.
 
 ## Work Guidance
 - Test public behavior and record proof-first evidence when practical.
@@ -29,4 +35,6 @@
 - U3 focus: `node --import tsx --test packages/core/test/U3.test.ts` verifies synthetic cryptographic protocol, not physical custody.
 
 ## Child DOX Index
-- None. This contract owns domain source and tests recursively.
+- `src/adapters/AGENTS.md` — scoped issuer/store transports and value boundaries.
+- `src/discovery/AGENTS.md` — read-only source scanning and coverage provenance.
+- Core retains authority, engine, OAuth/native contracts and all focused tests.

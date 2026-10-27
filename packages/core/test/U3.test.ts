@@ -14,13 +14,17 @@ export function fixture(file = join(mkdtempSync(join(tmpdir(), 'keyroot-u3-')), 
     const journal = new Journal(file, { installationId: 'installation', bootId: 'boot' });
     const keys = generateKeyPairSync('ec', { namedCurve: 'prime256v1' });
     const jwk = keys.publicKey.export({ format: 'jwk' });
-    const approvals = new ApprovalService(journal, { mode: 'synthetic' });
+    let authorityNow = 2000;
+    const setNow = (now: number) => {
+        authorityNow = now;
+    };
+    const approvals = new ApprovalService(journal, { mode: 'synthetic', clock: () => authorityNow });
     approvals.bootstrapApprover({ signerId: 'phone', role: 'routine', publicKey: jwk, localBootstrap: createLocalBootstrapContext(), confirmedFingerprint: publicKeyFingerprint(jwk) });
     const value = manifest();
     const raw = canonicalizeManifest(value);
     const signature = sign('sha256', Buffer.from(raw), { key: keys.privateKey, dsaEncoding: 'ieee-p1363' }).toString('base64url');
     approvals.registerGrant(raw, signature, 2000);
-    return { journal, approvals, value, raw, signature, file, keys };
+    return { journal, approvals, value, raw, signature, file, keys, setNow };
 }
 test('U3 canonical manifest rejects duplicate, unknown, unsafe and policy tampering before signature', () => {
     const raw = canonicalizeManifest(manifest());
@@ -39,7 +43,8 @@ test('U3 admission once, stable intent before effect, bounded steps and cancella
     assert.equal(Object.isFrozen(intent), true);
     assert.equal(f.journal.listIntents('op').length, 1);
     await assert.rejects(f.approvals.authorizeEffect(request));
-    f.journal.appendReceipt({ receiptId: 'receipt-create', intentId: intent.intentId, kind: 'creation', outcome: 'confirmed', generation: 2, observedAt: 2001, observerId: 'synthetic', evidenceHash: 'sha256:synthetic', limitationCodes: ['synthetic-only'] });
+    f.journal.appendReceipt({ receiptId: 'receipt-create', intentId: intent.intentId, accountId: 'account', parentResourceId: 'resource', resourceId: 'created-id', kind: 'creation', outcome: 'confirmed', generation: 2, observedAt: 2001, observerId: 'synthetic', evidenceHash: 'sha256:synthetic', limitationCodes: ['synthetic-only'] });
+    f.journal.resolveIntent({ intentId: intent.intentId, receiptIds: ['receipt-create'] });
     const next = await f.approvals.authorizeEffect({ ...request, actionId: 'deliver' });
     assert.equal(next.operationId, 'op');
     f.approvals.cancelGrant(f.value.nonce);
@@ -49,7 +54,7 @@ test('U3 admission once, stable intent before effect, bounded steps and cancella
 test('U3 two connections cannot consume same instance or forget live lineage', async () => {
     const f = fixture();
     const second = new Journal(f.file, { installationId: 'installation', bootId: 'boot' });
-    const approvals = new ApprovalService(second, { mode: 'synthetic' });
+    const approvals = new ApprovalService(second, { mode: 'synthetic', clock: () => 2000 });
     const req = { grantId: f.value.nonce, signature: f.signature, operationId: 'op', actionId: 'create', currentSnapshotDigest: snapshotDigest(f.value), now: 2000 };
     const results = await Promise.allSettled([f.approvals.authorizeEffect(req), approvals.authorizeEffect(req)]);
     assert.equal(results.filter(r => r.status === 'fulfilled').length, 1);
@@ -64,7 +69,7 @@ test('U3 restart invalidates grants, retains intent and requires reconciliation'
     const restored = new Journal(f.file, { installationId: 'installation', bootId: 'new-boot' });
     assert.equal(restored.inspectOperation('op')?.state, 'reconcile-required');
     assert.equal(restored.listIntents('op').length, 1);
-    await assert.rejects(new ApprovalService(restored, { mode: 'synthetic' }).authorizeEffect({ grantId: f.value.nonce, signature: f.signature, operationId: 'op', actionId: 'deliver', currentSnapshotDigest: snapshotDigest(f.value), now: 2000 }));
+    await assert.rejects(new ApprovalService(restored, { mode: 'synthetic', clock: () => 2000 }).authorizeEffect({ grantId: f.value.nonce, signature: f.signature, operationId: 'op', actionId: 'deliver', currentSnapshotDigest: snapshotDigest(f.value), now: 2000 }));
     restored.close();
 });
 test('U3 budgets derive minimum create/restart costs and cannot be bypassed with signed zero', () => {
@@ -78,6 +83,8 @@ test('U3 budgets derive minimum create/restart costs and cannot be bypassed with
 test('U3 cancellation, expiry, changed snapshot, wrong signature and wrong role fail closed', async () => {
     for (const variant of ['cancel', 'expire', 'snapshot', 'signature', 'role'] as const) {
         const f = fixture();
+        if (variant === 'expire')
+            f.setNow(10000);
         if (variant === 'cancel')
             f.approvals.cancelGrant(f.value.nonce);
         if (variant === 'role')
@@ -101,7 +108,8 @@ test('U3 budget exhaustion is transactional and no second operation is admitted'
     f.approvals.registerGrant(raw, signature, 2000);
     const req = { grantId: value.nonce, signature, operationId: 'op', actionId: 'create', currentSnapshotDigest: snapshotDigest(value), now: 2000 };
     const intent = await f.approvals.authorizeEffect(req);
-    f.journal.appendReceipt({ receiptId: 'created', intentId: intent.intentId, kind: 'creation', outcome: 'confirmed', generation: 2, observedAt: 2001, observerId: 'fixture', evidenceHash: 'sha256:fixture', limitationCodes: ['synthetic-only'] });
+    f.journal.appendReceipt({ receiptId: 'created', intentId: intent.intentId, accountId: 'account', parentResourceId: 'resource', resourceId: 'created-id', kind: 'creation', outcome: 'confirmed', generation: 2, observedAt: 2001, observerId: 'fixture', evidenceHash: 'sha256:fixture', limitationCodes: ['synthetic-only'] });
+    f.journal.resolveIntent({ intentId: intent.intentId, receiptIds: ['created'] });
     await assert.rejects(f.approvals.authorizeEffect({ ...req, actionId: 'deliver' }), /budget/);
     assert.equal(f.journal.listIntents('op').length, 1);
     f.journal.close();
@@ -111,7 +119,7 @@ test('U3 receipt schema refuses raw payload, unknown outcome and forgetting ambi
     const intent = await f.approvals.authorizeEffect({ grantId: f.value.nonce, signature: f.signature, operationId: 'op', actionId: 'create', currentSnapshotDigest: snapshotDigest(f.value), now: 2000 });
     assert.throws(() => f.journal.completeOperation('op'), /ambiguous/);
     assert.throws(() => f.journal.reconcileOperation('op'), /reconciliation/);
-    const receipt = { receiptId: 'created', intentId: intent.intentId, kind: 'creation' as const, outcome: 'confirmed' as const, generation: 2, observedAt: 2001, observerId: 'fixture', evidenceHash: 'sha256:fixture', limitationCodes: ['synthetic-only'] };
+    const receipt = { receiptId: 'created', intentId: intent.intentId, accountId: 'account', parentResourceId: 'resource', resourceId: 'created-id', kind: 'creation' as const, outcome: 'confirmed' as const, generation: 2, observedAt: 2001, observerId: 'fixture', evidenceHash: 'sha256:fixture', limitationCodes: ['synthetic-only'] };
     assert.throws(() => f.journal.appendReceipt({ ...receipt, rawPayload: 'secret' } as typeof receipt), /payload/);
     f.journal.close();
 });
@@ -165,13 +173,17 @@ function emergencyFixture() {
     const emergency = new EmergencyWebAuthn(journal, { clock: () => 2001 });
     const credentialId = Buffer.from('synthetic-security-key').toString('base64url');
     emergency.bootstrapCredential({ signerId: 'emergency', credentialId, cosePublicKey: cose, rpId: 'approve.keyroot.test', origin: 'https://approve.keyroot.test', localBootstrap: createLocalBootstrapContext(), confirmedFingerprint: publicKeyFingerprint(jwk) });
-    const approvals = new ApprovalService(journal, { mode: 'synthetic' });
+    let authorityNow = 2000;
+    const setNow = (now: number) => {
+        authorityNow = now;
+    };
+    const approvals = new ApprovalService(journal, { mode: 'synthetic', clock: () => authorityNow });
     const value = manifest();
     value.role = 'emergency';
     value.signerId = 'emergency';
     value.nonce = 'emergency-nonce';
     approvals.registerEmergencyGrant(canonicalizeManifest(value), 2000);
-    return { journal, keys, jwk, emergency, approvals, value, credentialId };
+    return { journal, keys, jwk, emergency, approvals, value, credentialId, setNow };
 }
 function assertion(f: ReturnType<typeof emergencyFixture>, challenge: string, options: {
     origin?: string;
@@ -241,7 +253,7 @@ test('U3 epoch CAS detects simultaneous clones and prevents later dispatch', asy
     const results = await Promise.allSettled([a.establishFresh(), b.establishFresh()]);
     assert.equal(results.filter(r => r.status === 'fulfilled').length, 1);
     await a.assertBeforeEffect();
-    await b.recover({ predecessor: 'quiesced', evidenceHash: 'sha256:' + 'a'.repeat(64), inFlightOutcomes: 'reconciled' });
+    await b.recover({ predecessor: 'quiesced', observedPredecessor: { ...store.current! }, evidenceHash: 'sha256:' + 'a'.repeat(64), inFlightOutcomes: 'reconciled' });
     await assert.rejects(a.assertBeforeEffect(), /epoch lost/);
     await b.assertBeforeEffect();
     f.journal.close();
@@ -267,12 +279,14 @@ test('U3 restored pending upstream work remains unknown; epoch cannot promise to
     const restored = new Journal(path, { installationId: 'installation', bootId: 'restore' });
     const epoch = new InstallationEpoch('installation', store, restored);
     await assert.rejects(epoch.establishFresh(), /recovery/);
-    await assert.rejects(epoch.recover({ predecessor: 'management-authority-invalidated', evidenceHash: 'sha256:' + 'b'.repeat(64), inFlightOutcomes: 'reconciled' }), /Unreconciled/);
+    await assert.rejects(epoch.recover({ predecessor: 'management-authority-invalidated', observedPredecessor: { ...store.current! }, evidenceHash: 'sha256:' + 'b'.repeat(64), inFlightOutcomes: 'reconciled' }), /Unreconciled/);
     finish();
     await upstream;
     assert.equal(issuedEffects, 1);
-    restored.appendReceipt({ receiptId: 'external-reconciliation', intentId: intent.intentId, kind: 'reconciliation', outcome: 'confirmed', generation: 2, observedAt: 3000, observerId: 'fixture', evidenceHash: 'sha256:fixture', limitationCodes: ['synthetic-only'] });
-    await epoch.recover({ predecessor: 'management-authority-invalidated', evidenceHash: 'sha256:' + 'b'.repeat(64), inFlightOutcomes: 'reconciled' });
+    restored.appendReceipt({ receiptId: 'issuer-observation', intentId: intent.intentId, kind: 'creation', outcome: 'confirmed', generation: 2, accountId: 'account', resourceId: 'created-id', parentResourceId: 'resource', observedAt: 3000, observerId: 'fixture', evidenceHash: 'sha256:fixture', limitationCodes: ['synthetic-only'] });
+    restored.appendReceipt({ receiptId: 'external-reconciliation', intentId: intent.intentId, kind: 'reconciliation', outcome: 'confirmed', generation: 2, accountId: 'account', resourceId: 'created-id', reconcilesReceiptIds: [], observedAt: 3000, observerId: 'fixture', evidenceHash: 'sha256:fixture', limitationCodes: ['synthetic-only'] });
+    restored.resolveIntent({ intentId: intent.intentId, receiptIds: ['issuer-observation'], reconciliationReceiptId: 'external-reconciliation' });
+    await epoch.recover({ predecessor: 'management-authority-invalidated', observedPredecessor: { ...store.current! }, evidenceHash: 'sha256:' + 'b'.repeat(64), inFlightOutcomes: 'reconciled' });
     await epoch.assertBeforeEffect();
     await assert.rejects(original.assertBeforeEffect());
     f.journal.close();
@@ -314,9 +328,11 @@ test('U3 restart needs actual reconciliation AND fresh authority; stable action 
     f.journal.close();
     const journal = new Journal(f.file, { installationId: 'installation', bootId: 'next-boot' });
     assert.equal(journal.sessionActive('owner-session'), false);
-    journal.appendReceipt({ receiptId: 'reconcile-create', intentId: first.intentId, kind: 'reconciliation', outcome: 'confirmed', generation: 2, observedAt: 3000, observerId: 'fixture', evidenceHash: 'sha256:fixture', resourceId: 'created-id', handleId: 'store-handle', limitationCodes: ['synthetic-only'] });
+    journal.appendReceipt({ receiptId: 'issuer-observation', intentId: first.intentId, kind: 'creation', outcome: 'confirmed', generation: 2, accountId: 'account', resourceId: 'created-id', parentResourceId: 'resource', observedAt: 3000, observerId: 'fixture', evidenceHash: 'sha256:fixture', limitationCodes: ['synthetic-only'] });
+    journal.appendReceipt({ receiptId: 'reconcile-create', intentId: first.intentId, kind: 'reconciliation', outcome: 'confirmed', generation: 2, accountId: 'account', resourceId: 'created-id', reconcilesReceiptIds: [], observedAt: 3000, observerId: 'fixture', evidenceHash: 'sha256:fixture', limitationCodes: ['synthetic-only'] });
+    journal.resolveIntent({ intentId: first.intentId, receiptIds: ['issuer-observation'], reconciliationReceiptId: 'reconcile-create' });
     journal.reconcileOperation('op');
-    const approvals = new ApprovalService(journal, { mode: 'synthetic' });
+    const approvals = new ApprovalService(journal, { mode: 'synthetic', clock: () => 3000 });
     const m = manifest();
     m.bootId = 'next-boot';
     m.nonce = 'fresh-grant';
@@ -398,6 +414,11 @@ test('U3 pending create permits only separately authorized concrete old-resource
         if (variant === 'old-revoke') {
             const containment = await f.approvals.authorizeEffect(request);
             assert.equal(containment.kind, 'revoke');
+            const continued = await f.approvals.assertReservedIntentAuthority({ ...request, intentId: containment.intentId });
+            assert.equal(continued.intentId, containment.intentId);
+            await assert.rejects(f.approvals.assertReservedIntentAuthority({ grantId: f.value.nonce, operationId: 'op', actionId: 'create', currentSnapshotDigest: snapshotDigest(f.value), emergencyProofId: proof, intentId: first.intentId }), /fenced/);
+            f.journal.transaction(db => db.prepare("INSERT INTO intent VALUES(?,?,?,?,?,?,?,'unknown')").run('competing-uncertainty', 'competing-uncertainty', 'op', 'competing-revoke', m.nonce, 'revoke', JSON.stringify({ resourceId: 'known-old-key', handleId: 'old-handle', generation: 1 })));
+            await assert.rejects(f.approvals.assertReservedIntentAuthority({ ...request, intentId: containment.intentId }), /ambiguous/);
             assert.equal(f.journal.inspectOperation('op')!.state, 'reconcile-required');
             assert.equal(f.journal.listIntents('op').find(i => i.intentId === first.intentId)!.state, 'pending');
             assert.equal(f.journal.read(db => db.prepare('SELECT cancelled FROM approval_grant WHERE grant_id=?').get('routine-window')!.cancelled), 1);
@@ -466,6 +487,7 @@ test('U3 emergency proof has short expiry even while weekly authority remains va
     f.approvals.registerEmergencyGrant(canonicalizeManifest(m), 2000);
     const c = f.emergency.createChallenge({ grantId: m.nonce, operationId: 'op', actionId: 'create', now: 2000 });
     const proof = await f.emergency.verifyAssertion({ challengeId: c.challengeId, operationId: 'op', actionId: 'create', response: assertion(f, c.challenge), now: 2001 });
+    f.setNow(32002);
     await assert.rejects(f.approvals.authorizeEffect({ grantId: m.nonce, operationId: 'op', actionId: 'create', currentSnapshotDigest: snapshotDigest(m), emergencyProofId: proof, now: 32002 }), /assertion/);
     assert.equal(f.journal.listIntents('op').length, 0);
     f.journal.close();
@@ -477,5 +499,130 @@ test('U3 asynchronous verification rechecks trusted clock before reserving or is
     await assert.rejects(expired.verifyAssertion({ challengeId: c.challengeId, operationId: 'op', actionId: 'create', response: assertion(f, c.challenge), now: 2001 }), /expired during/);
     assert.equal(f.journal.read(db => db.prepare('SELECT count(*) AS n FROM emergency_reservation').get()!.n), 0);
     assert.equal(f.journal.read(db => db.prepare('SELECT count(*) AS n FROM emergency_proof').get()!.n), 0);
+    f.journal.close();
+});
+test('U3 review regression: partial compound creation remains pending and store continuation stays authorized', async () => {
+    const f = fixture();
+    const m = manifest();
+    m.nonce = 'partial-compound';
+    m.operations[0]!.actions[0]!.budgetCost.effects = 2;
+    const raw = canonicalizeManifest(m);
+    const signature = sign('sha256', Buffer.from(raw), { key: f.keys.privateKey, dsaEncoding: 'ieee-p1363' }).toString('base64url');
+    f.approvals.registerGrant(raw, signature, 2000);
+    const request = { grantId: m.nonce, signature, operationId: 'op', actionId: 'create', currentSnapshotDigest: snapshotDigest(m), now: 2000 };
+    const intent = await f.approvals.authorizeEffect(request);
+    f.journal.appendReceipt({ receiptId: 'partial-create', intentId: intent.intentId, kind: 'creation', outcome: 'confirmed', generation: 2, resourceId: 'created-key', parentResourceId: 'resource', accountId: 'account', observedAt: 2001, observerId: 'fixture', evidenceHash: 'sha256:fixture', limitationCodes: ['synthetic-only'] });
+    assert.equal(f.journal.listIntents('op')[0]!.state, 'pending');
+    await f.approvals.assertCurrentAuthority({ ...request, intentId: intent.intentId });
+    assert.throws(() => f.journal.resolveIntent({ intentId: intent.intentId, receiptIds: ['partial-create'] }), /storage/);
+    f.journal.close();
+});
+test('U3 review regression: stale predecessor evidence cannot fence a newer third controller', async () => {
+    const store = new MemoryEpoch();
+    const make = (bootId: string) => new Journal(join(mkdtempSync(join(tmpdir(), 'kr-u3-epoch-review-')), 'db.sqlite'), { installationId: 'installation', bootId });
+    const aJournal = make('A'), bJournal = make('B'), cJournal = make('C');
+    const a = new InstallationEpoch('installation', store, aJournal), b = new InstallationEpoch('installation', store, bJournal), c = new InstallationEpoch('installation', store, cJournal);
+    await a.establishFresh();
+    const observedPredecessor = { ...store.current! };
+    const evidence = { predecessor: 'quiesced' as const, observedPredecessor, evidenceHash: 'sha256:' + 'c'.repeat(64), inFlightOutcomes: 'reconciled' as const };
+    await c.recover(evidence);
+    await assert.rejects(b.recover(evidence), /predecessor/);
+    assert.equal(b.recoveryHeld, true);
+    assert.equal(store.current!.ownerId, c.ownerId);
+    await c.assertBeforeEffect();
+    aJournal.close();
+    bJournal.close();
+    cJournal.close();
+});
+test('U3 review regression: failed emergency credential insertion rolls back approver and audit', () => {
+    const journal = new Journal(join(mkdtempSync(join(tmpdir(), 'kr-u3-bootstrap-review-')), 'db.sqlite'), { installationId: 'installation', bootId: 'boot' });
+    journal.read(db => db.exec("CREATE TRIGGER fail_emergency_insert BEFORE INSERT ON emergency_credential BEGIN SELECT RAISE(ABORT,'synthetic insertion failure'); END;"));
+    const keys = generateKeyPairSync('ec', { namedCurve: 'prime256v1' });
+    const jwk = keys.publicKey.export({ format: 'jwk' });
+    const cose = isoCBOR.encode(new Map<number, number | Uint8Array>([[1, 2], [3, -7], [-1, 1], [-2, Buffer.from(jwk.x!, 'base64url')], [-3, Buffer.from(jwk.y!, 'base64url')]]));
+    const emergency = new EmergencyWebAuthn(journal, { clock: () => 2001 });
+    assert.throws(() => emergency.bootstrapCredential({ signerId: 'emergency', credentialId: Buffer.from('synthetic-key').toString('base64url'), cosePublicKey: cose, rpId: 'approve.keyroot.test', origin: 'https://approve.keyroot.test', localBootstrap: createLocalBootstrapContext(), confirmedFingerprint: publicKeyFingerprint(jwk) }), /synthetic insertion/);
+    assert.equal(journal.read(db => db.prepare('SELECT count(*) AS n FROM approver').get()!.n), 0);
+    assert.equal(journal.read(db => db.prepare('SELECT count(*) AS n FROM audit').get()!.n), 0);
+    journal.close();
+});
+test('U3 review regression: unknown storage plus delayed creation needs full explicit bound reconciliation', async () => {
+    const f = fixture();
+    const m = manifest();
+    m.nonce = 'unknown-compound';
+    m.operations[0]!.actions[0]!.budgetCost.effects = 2;
+    const raw = canonicalizeManifest(m);
+    const signature = sign('sha256', Buffer.from(raw), { key: f.keys.privateKey, dsaEncoding: 'ieee-p1363' }).toString('base64url');
+    f.approvals.registerGrant(raw, signature, 2000);
+    const request = { grantId: m.nonce, signature, operationId: 'op', actionId: 'create', currentSnapshotDigest: snapshotDigest(m), now: 2000 };
+    const intent = await f.approvals.authorizeEffect(request);
+    const subject = { intentId: intent.intentId, generation: 2, resourceId: 'created-key', accountId: 'account', observedAt: 2001, observerId: 'fixture', evidenceHash: 'sha256:fixture', limitationCodes: ['synthetic-only'] };
+    f.journal.appendReceipt({ ...subject, receiptId: 'unknown-store', kind: 'storage', outcome: 'unknown', handleId: 'store-handle', destinationId: 'vault-target' });
+    f.journal.appendReceipt({ ...subject, receiptId: 'delayed-create', kind: 'creation', outcome: 'confirmed', parentResourceId: 'resource' });
+    assert.equal(f.journal.listIntents('op')[0]!.state, 'pending');
+    await assert.rejects(f.approvals.assertCurrentAuthority({ ...request, intentId: intent.intentId }), /reconciliation/);
+    f.journal.appendReceipt({ ...subject, receiptId: 'confirmed-store', kind: 'storage', outcome: 'confirmed', handleId: 'store-handle', destinationId: 'vault-target', storeVersion: 3 });
+    assert.throws(() => f.journal.resolveIntent({ intentId: intent.intentId, receiptIds: ['delayed-create', 'confirmed-store'] }), /reconciliation/);
+    f.journal.appendReceipt({ ...subject, receiptId: 'full-reconcile', kind: 'reconciliation', outcome: 'confirmed', observedAt: 2002, handleId: 'store-handle', destinationId: 'vault-target', storeVersion: 3, reconcilesReceiptIds: ['unknown-store'] });
+    f.journal.resolveIntent({ intentId: intent.intentId, receiptIds: ['delayed-create', 'confirmed-store'], reconciliationReceiptId: 'full-reconcile' });
+    assert.equal(f.journal.listIntents('op')[0]!.state, 'observed');
+    assert.equal(f.journal.listReceipts('op').find(r => r.receiptId === 'unknown-store')!.outcome, 'unknown');
+    f.journal.close();
+});
+test('U3 review regression: wrong receipt kind, generation, account, parent and created subject cannot resolve', async () => {
+    for (const bad of ['kind', 'generation', 'account', 'parent', 'issuer', 'handle', 'version', 'reconcile-subject'] as const) {
+        const f = fixture();
+        const m = manifest();
+        m.nonce = 'invalid-evidence';
+        m.operations[0]!.actions[0]!.budgetCost.effects = 2;
+        const raw = canonicalizeManifest(m);
+        const signature = sign('sha256', Buffer.from(raw), { key: f.keys.privateKey, dsaEncoding: 'ieee-p1363' }).toString('base64url');
+        f.approvals.registerGrant(raw, signature, 2000);
+        const intent = await f.approvals.authorizeEffect({ grantId: m.nonce, signature, operationId: 'op', actionId: 'create', currentSnapshotDigest: snapshotDigest(m), now: 2000 });
+        const subject = { intentId: intent.intentId, generation: 2, resourceId: 'created-key', accountId: 'account', observedAt: 2001, observerId: 'fixture', evidenceHash: 'sha256:fixture', limitationCodes: ['synthetic-only'] };
+        f.journal.appendReceipt({ ...subject, receiptId: 'create', kind: bad === 'kind' ? 'validation' : 'creation', outcome: 'confirmed', generation: bad === 'generation' ? 1 : 2, accountId: bad === 'account' ? 'other-account' : 'account', parentResourceId: bad === 'parent' ? 'other-parent' : 'resource' });
+        f.journal.appendReceipt({ ...subject, receiptId: 'store', kind: 'storage', outcome: 'confirmed', resourceId: bad === 'issuer' ? 'different-key' : 'created-key', handleId: bad === 'handle' ? 'wrong-handle' : 'store-handle', destinationId: 'vault-target', ...(bad === 'version' ? {} : { storeVersion: 3 }) });
+        if (bad === 'reconcile-subject') {
+            f.journal.appendReceipt({ ...subject, receiptId: 'unknown', kind: 'storage', outcome: 'unknown' });
+            f.journal.appendReceipt({ ...subject, receiptId: 'wrong-reconcile', kind: 'reconciliation', outcome: 'confirmed', resourceId: 'different-key', handleId: 'store-handle', destinationId: 'vault-target', storeVersion: 3, reconcilesReceiptIds: ['unknown'] });
+        }
+        assert.throws(() => f.journal.resolveIntent({ intentId: intent.intentId, receiptIds: ['create', 'store'], ...(bad === 'reconcile-subject' ? { reconciliationReceiptId: 'wrong-reconcile' } : {}) }));
+        assert.equal(f.journal.listIntents('op')[0]!.state, 'pending');
+        f.journal.close();
+    }
+});
+test('U3 trusted clock is refreshed after async fence; stale request timestamp cannot authorize or continue', async () => {
+    const f = fixture();
+    let now = 2000;
+    const request = { grantId: f.value.nonce, signature: f.signature, operationId: 'op', actionId: 'create', currentSnapshotDigest: snapshotDigest(f.value), now: 2000 };
+    const afterWait = new ApprovalService(f.journal, { mode: 'synthetic', clock: () => now, checkEffectFence: async () => {
+            now = 10000;
+        } });
+    await assert.rejects(afterWait.authorizeEffect(request), /validity/);
+    assert.equal(f.journal.listIntents('op').length, 0);
+    const intent = await f.approvals.authorizeEffect(request);
+    const unchanged = await f.approvals.assertReservedIntentAuthority({ ...request, intentId: intent.intentId, now: 100000000 });
+    assert.equal(unchanged.intentId, intent.intentId);
+    assert.equal(f.journal.listIntents('op').length, 1);
+    now = 2000;
+    await assert.rejects(afterWait.assertReservedIntentAuthority({ ...request, intentId: intent.intentId }), /validity/);
+    assert.equal(f.journal.listIntents('op')[0]!.state, 'pending');
+    f.journal.close();
+});
+test('U3 held routine compound continuation remains fenced despite a valid reserved intent', async () => {
+    const f = fixture();
+    const m = manifest();
+    m.nonce = 'held-routine';
+    m.operations[0]!.actions[0]!.budgetCost.effects = 2;
+    const raw = canonicalizeManifest(m);
+    const signature = sign('sha256', Buffer.from(raw), { key: f.keys.privateKey, dsaEncoding: 'ieee-p1363' }).toString('base64url');
+    f.approvals.registerGrant(raw, signature, 2000);
+    const request = { grantId: m.nonce, signature, operationId: 'op', actionId: 'create', currentSnapshotDigest: snapshotDigest(m) };
+    const intent = await f.approvals.authorizeEffect(request);
+    f.journal.transaction(db => db.prepare("UPDATE operation SET state='reconcile-required' WHERE operation_id='op'").run());
+    await assert.rejects(f.approvals.assertReservedIntentAuthority({ ...request, intentId: intent.intentId }), /fenced/);
+    await assert.rejects(f.approvals.assertCurrentAuthority({ ...request, intentId: intent.intentId }), /fenced/);
+    assert.equal(f.journal.listIntents('op')[0]!.state, 'pending');
+    assert.equal(f.journal.inspectOperation('op')!.state, 'reconcile-required');
     f.journal.close();
 });

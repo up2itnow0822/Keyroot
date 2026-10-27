@@ -1,6 +1,7 @@
+import type { DatabaseSync } from 'node:sqlite';
 import { createHash, createPublicKey, verify, randomUUID, type JsonWebKey as NodeJsonWebKey } from 'node:crypto';
-import { Journal, type AuthorizedIntent } from './journal.js';
-import { actionCost, canonicalJSON, manifestDigest, parseCanonicalManifest, snapshotDigest, type ApprovalManifest, type SignerRole } from './manifest.js';
+import { Journal, type AuthorizedIntent, type OperationRecord } from './journal.js';
+import { actionCost, canonicalJSON, manifestDigest, parseCanonicalManifest, snapshotDigest, type ApprovalManifest, type ManifestOperation, type ManifestAction, type SignerRole } from './manifest.js';
 const localBootstraps = new WeakSet<object>();
 export interface LocalBootstrapContext {
     readonly kind: 'local-console-bootstrap';
@@ -38,22 +39,29 @@ export interface AuthorizeEffectRequest {
     operationId: string;
     actionId: string;
     currentSnapshotDigest: string;
+    /** Retained compatibility metadata; ignored for effect authority. The executor injects the trusted clock. */
     now?: number;
     emergencyProofId?: string;
+}
+export interface ApproverBootstrap {
+    signerId: string;
+    role: SignerRole;
+    publicKey: JsonWebKey;
+    localBootstrap: LocalBootstrapContext;
+    confirmedFingerprint: string;
 }
 export class ApprovalService {
     constructor(readonly journal: Journal, private readonly options: {
         mode: 'synthetic' | 'real';
+        clock?: () => number;
         checkEffectFence?: () => Promise<void>;
     }) {
     }
-    bootstrapApprover(input: {
-        signerId: string;
-        role: SignerRole;
-        publicKey: JsonWebKey;
-        localBootstrap: LocalBootstrapContext;
-        confirmedFingerprint: string;
-    }): void {
+    bootstrapApprover(input: ApproverBootstrap): void {
+        this.journal.transaction(db => this.bootstrapApproverInTransaction(db, input));
+    }
+    /** Internal local-bootstrap primitive; caller owns the transaction and any dependent credential insert. */
+    bootstrapApproverInTransaction(db: DatabaseSync, input: ApproverBootstrap): void {
         if (!localBootstraps.has(input.localBootstrap))
             throw new Error('Explicit trusted local bootstrap required');
         const fingerprint = publicKeyFingerprint(input.publicKey);
@@ -61,13 +69,11 @@ export class ApprovalService {
             throw new Error('Independent fingerprint comparison required');
         if (input.role !== 'routine' && input.role !== 'emergency')
             throw new Error('Invalid signer role');
-        this.journal.transaction(db => {
-            this.journal.assertCurrent(db);
-            if (db.prepare('SELECT 1 FROM approver').get())
-                throw new Error('Trust configuration is not empty');
-            db.prepare('INSERT INTO approver(signer_id,role,public_key,fingerprint) VALUES(?,?,?,?)').run(input.signerId, input.role, canonicalJSON(input.publicKey), fingerprint);
-            this.journal.audit(db, 'approver-local-bootstrap', null, input.signerId);
-        });
+        this.journal.assertCurrent(db);
+        if (db.prepare('SELECT 1 FROM approver').get())
+            throw new Error('Trust configuration is not empty');
+        db.prepare('INSERT INTO approver(signer_id,role,public_key,fingerprint) VALUES(?,?,?,?)').run(input.signerId, input.role, canonicalJSON(input.publicKey), fingerprint);
+        this.journal.audit(db, 'approver-local-bootstrap', null, input.signerId);
     }
     /** Enrolling the separate emergency key is itself an owner-authorized admin action in U10. */
     revokeApprover(signerId: string): void {
@@ -121,21 +127,55 @@ export class ApprovalService {
         });
         return manifest.nonce;
     }
-    /** Trusted executor continuation of an already-reserved compound create, immediately before its one store CAS. */
-    async assertCurrentAuthority(request: AuthorizeEffectRequest & {
+    /** One predicate for initial admission and continuation; the reserved intent itself is excluded by the latter. */
+    private isNarrowEmergencyContainment(manifest: ApprovalManifest, operation: ManifestOperation, action: ManifestAction, existing: OperationRecord | undefined, unresolved: readonly Record<string, unknown>[], reservedIntentId?: string): boolean {
+        if (manifest.role !== 'emergency' || !unresolved.length || !existing || !['revoke', 'quarantine', 'sign-out'].includes(action.kind))
+            return false;
+        if (existing.state === 'completed' || existing.lineageId !== operation.lineageId || existing.accountId !== operation.accountId || existing.fromGeneration !== operation.fromGeneration || existing.toGeneration !== operation.toGeneration)
+            throw new Error('Containment must attach to the exact predecessor');
+        const target = action.parameters.resourceId;
+        if (!target || target.startsWith('created:') || (action.kind !== 'quarantine' && action.parameters.generation !== operation.fromGeneration))
+            throw new Error('Containment requires concrete known old resource');
+        if (action.kind === 'quarantine' && !manifest.consumerMap.entries.some(e => e.consumerId === action.parameters.consumerId))
+            throw new Error('Quarantine consumer outside exact signed map');
+        for (const row of unresolved) {
+            if (row.intent_id === reservedIntentId)
+                continue;
+            const params = JSON.parse(String(row.parameters)) as Record<string, unknown>;
+            if ((action.kind === 'quarantine' && params.consumerId === action.parameters.consumerId) || (action.kind !== 'quarantine' && params.resourceId === target))
+                throw new Error('Containment cannot target ambiguous resource');
+        }
+        return true;
+    }
+    /** Continuation of exactly the reserved action, with no new intent or additional effect authority. */
+    assertReservedIntentAuthority(request: AuthorizeEffectRequest & {
         intentId: string;
     }): Promise<AuthorizedIntent> {
+        return this.checkReservedIntentAuthority(request, false);
+    }
+    /** Compound create continuation additionally requires both effect slots and the signed store target. */
+    assertCurrentAuthority(request: AuthorizeEffectRequest & {
+        intentId: string;
+    }): Promise<AuthorizedIntent> {
+        return this.checkReservedIntentAuthority(request, true);
+    }
+    private async checkReservedIntentAuthority(request: AuthorizeEffectRequest & {
+        intentId: string;
+    }, compoundCreate: boolean): Promise<AuthorizedIntent> {
         if (this.options.mode === 'real')
             throw new Error('Real mutation remains gated pending custody, isolation and recovery admission');
         await this.options.checkEffectFence?.();
         return this.journal.transaction(db => {
             this.journal.assertCurrent(db);
+            const now = this.options.clock?.() ?? Date.now();
             const grant = db.prepare('SELECT * FROM approval_grant WHERE grant_id=? AND cancelled=0').get(request.grantId) as unknown as GrantRow | undefined;
             if (!grant)
                 throw new Error('Cancelled or unknown approval');
             const manifest = parseCanonicalManifest(grant.raw_manifest);
-            this.checkManifest(manifest, request.now ?? Date.now());
+            this.checkManifest(manifest, now);
             if (manifest.role === 'routine') {
+                if (request.emergencyProofId)
+                    throw new Error('Emergency proof cannot authorize routine work');
                 if (request.signature !== grant.signature)
                     throw new Error('Signature mismatch');
                 this.verifySignature(manifest, grant.raw_manifest, request.signature);
@@ -143,7 +183,7 @@ export class ApprovalService {
             else {
                 const signer = db.prepare("SELECT 1 FROM approver WHERE signer_id=? AND role='emergency' AND revoked=0").get(manifest.signerId);
                 const proof = db.prepare('SELECT * FROM emergency_proof WHERE proof_id=? AND used=1').get(request.emergencyProofId ?? '');
-                if (!signer || !proof || proof.grant_id !== request.grantId || proof.digest !== grant.digest || proof.operation_id !== request.operationId || proof.action_id !== request.actionId || Number(proof.expires_at) <= (request.now ?? Date.now()))
+                if (!signer || !proof || proof.grant_id !== request.grantId || proof.digest !== grant.digest || proof.operation_id !== request.operationId || proof.action_id !== request.actionId || Number(proof.expires_at) <= (now))
                     throw new Error('Emergency continuation authority missing');
             }
             if (snapshotDigest(manifest) !== request.currentSnapshotDigest)
@@ -155,10 +195,21 @@ export class ApprovalService {
             const row = db.prepare("SELECT * FROM intent WHERE intent_id=? AND operation_id=? AND action_id=? AND grant_id=? AND state='pending'").get(request.intentId, request.operationId, request.actionId, request.grantId);
             if (!op || !action || !row || row.kind !== action.kind || row.parameters !== canonicalJSON(action.parameters))
                 throw new Error('Exact reserved intent missing');
-            if (action.kind !== 'create' || action.budgetCost.effects < 2 || !action.parameters.handleId || !action.parameters.destinationId)
+            if (db.prepare('SELECT metadata FROM receipt WHERE intent_id=?').all(request.intentId).some(row => (JSON.parse(String(row.metadata)) as {
+                outcome: string;
+            }).outcome === 'unknown'))
+                throw new Error('Reserved effect needs explicit reconciliation');
+            if (compoundCreate && (action.kind !== 'create' || action.budgetCost.effects < 2 || !action.parameters.handleId || !action.parameters.destinationId))
                 throw new Error('Compound create/store must reserve two effects and exact store target');
             const operation = this.journal.inspectOperation(request.operationId);
-            if (!operation || operation.state !== 'active' || !db.prepare('SELECT 1 FROM lineage_lock WHERE lineage_id=? AND operation_id=?').get(op.lineageId, op.operationId))
+            let heldContainment = false;
+            if (operation?.state === 'reconcile-required' && manifest.role === 'emergency' && !compoundCreate) {
+                if (!db.prepare('SELECT 1 FROM emergency_reservation WHERE grant_id=? AND lineage_id=?').get(request.grantId, op.lineageId))
+                    throw new Error('Missing emergency reservation');
+                const unresolved = db.prepare("SELECT * FROM intent WHERE operation_id=? AND state!='observed'").all(op.operationId);
+                heldContainment = this.isNarrowEmergencyContainment(manifest, op, action, operation, unresolved, request.intentId);
+            }
+            if (!operation || (operation.state !== 'active' && !heldContainment) || !db.prepare('SELECT 1 FROM lineage_lock WHERE lineage_id=? AND operation_id=?').get(op.lineageId, op.operationId))
                 throw new Error('Continuation operation fenced');
             return this.journal.intentRecord(row);
         });
@@ -176,11 +227,12 @@ export class ApprovalService {
         await this.options.checkEffectFence?.();
         return this.journal.transaction(db => {
             this.journal.assertCurrent(db);
+            const now = this.options.clock?.() ?? Date.now();
             const grant = db.prepare('SELECT * FROM approval_grant WHERE grant_id=?').get(request.grantId) as unknown as GrantRow | undefined;
             if (!grant || grant.cancelled)
                 throw new Error('Cancelled or unknown approval');
             const manifest = parseCanonicalManifest(grant.raw_manifest);
-            this.checkManifest(manifest, request.now ?? Date.now());
+            this.checkManifest(manifest, now);
             if (grant.boot_id !== this.journal.bootId)
                 throw new Error('Stale boot approval');
             if (manifest.role === 'routine') {
@@ -195,7 +247,7 @@ export class ApprovalService {
                 if (signer?.role !== 'emergency')
                     throw new Error('Emergency key revoked');
                 const proof = db.prepare('SELECT * FROM emergency_proof WHERE proof_id=? AND used=0').get(request.emergencyProofId ?? '');
-                if (!proof || proof.grant_id !== request.grantId || proof.digest !== grant.digest || proof.operation_id !== request.operationId || proof.action_id !== request.actionId || Number(proof.expires_at) <= (request.now ?? Date.now()))
+                if (!proof || proof.grant_id !== request.grantId || proof.digest !== grant.digest || proof.operation_id !== request.operationId || proof.action_id !== request.actionId || Number(proof.expires_at) <= (now))
                     throw new Error('Fresh emergency assertion required');
                 db.prepare('UPDATE emergency_proof SET used=1 WHERE proof_id=?').run(request.emergencyProofId!);
             }
@@ -209,23 +261,10 @@ export class ApprovalService {
                 throw new Error('Action outside signed finite scope');
             const unresolved = db.prepare("SELECT * FROM intent WHERE operation_id=? AND state!='observed'").all(operation.operationId);
             const existing = this.journal.inspectOperation(operation.operationId);
-            const emergencyContainment = manifest.role === 'emergency' && unresolved.length > 0 && existing !== undefined && ['revoke', 'quarantine', 'sign-out'].includes(action.kind);
-            if (emergencyContainment) {
-                if (existing.state === 'completed' || existing.lineageId !== operation.lineageId || existing.accountId !== operation.accountId || existing.fromGeneration !== operation.fromGeneration || existing.toGeneration !== operation.toGeneration)
-                    throw new Error('Containment must attach to the exact predecessor');
-                const target = action.parameters.resourceId;
-                if (!target || target.startsWith('created:') || (action.kind !== 'quarantine' && action.parameters.generation !== operation.fromGeneration))
-                    throw new Error('Containment requires concrete known old resource');
-                if (action.kind === 'quarantine' && !manifest.consumerMap.entries.some(e => e.consumerId === action.parameters.consumerId))
-                    throw new Error('Quarantine consumer outside exact signed map');
-                for (const row of unresolved) {
-                    const params = JSON.parse(String(row.parameters)) as Record<string, unknown>;
-                    if ((action.kind === 'quarantine' && params.consumerId === action.parameters.consumerId) || (action.kind !== 'quarantine' && params.resourceId === target))
-                        throw new Error('Containment cannot target ambiguous resource');
-                }
+            const emergencyContainment = this.isNarrowEmergencyContainment(manifest, operation, action, existing, unresolved);
+            if (emergencyContainment)
                 db.prepare("UPDATE operation SET state='reconcile-required' WHERE operation_id=?").run(operation.operationId);
-            }
-            const record = emergencyContainment ? existing : this.journal.ensureOperation(db, operation);
+            const record = emergencyContainment ? existing! : this.journal.ensureOperation(db, operation);
             const lock = db.prepare('SELECT * FROM lineage_lock WHERE lineage_id=? AND operation_id=?').get(record.lineageId, record.operationId);
             if (!lock)
                 throw new Error('Lineage fence missing');

@@ -1,6 +1,6 @@
 import { DatabaseSync } from 'node:sqlite';
 import { createHash, randomUUID } from 'node:crypto';
-import { deepFreeze, type ManifestOperation, type SignerRole } from './manifest.js';
+import { canonicalJSON, deepFreeze, parseCanonicalManifest, type ManifestOperation, type SignerRole } from './manifest.js';
 export type OperationState = 'active' | 'reconcile-required' | 'held' | 'completed';
 export interface OperationRecord {
     operationId: string;
@@ -21,7 +21,7 @@ export interface AuthorizedIntent {
     parameters: Readonly<Record<string, string | number>>;
     state: 'pending' | 'observed' | 'unknown';
 }
-export type ReceiptKind = 'creation' | 'validation' | 'storage' | 'delivery-accepted' | 'direct-use' | 'inferred-adoption' | 'issuer-revocation' | 'issuer-rejection' | 'reconciliation' | 'unknown';
+export type ReceiptKind = 'creation' | 'validation' | 'storage' | 'delivery-accepted' | 'direct-use' | 'inferred-adoption' | 'issuer-revocation' | 'issuer-rejection' | 'reconciliation' | 'unknown' | 'restart' | 'quarantine' | 'disable' | 'sign-out' | 'administration' | 'containment';
 export interface MetadataReceipt {
     receiptId: string;
     intentId: string;
@@ -35,6 +35,11 @@ export interface MetadataReceipt {
     revision?: string;
     resourceId?: string;
     handleId?: string;
+    accountId?: string;
+    parentResourceId?: string;
+    destinationId?: string;
+    storeVersion?: number;
+    reconcilesReceiptIds?: string[];
     limitationCodes: string[];
 }
 interface OperationRow {
@@ -184,20 +189,135 @@ export class Journal {
         return deepFreeze({ intentId: String(row.intent_id), idempotencyRef: String(row.idempotency_ref), operationId: String(row.operation_id), actionId: String(row.action_id), grantId: String(row.grant_id), kind: String(row.kind), parameters: JSON.parse(String(row.parameters)) as Record<string, string | number>, state: row.state as AuthorizedIntent['state'] });
     }
     appendReceipt(receipt: MetadataReceipt): void {
-        const fields = ['receiptId', 'intentId', 'kind', 'outcome', 'generation', 'observedAt', 'observerId', 'evidenceHash', 'consumerId', 'revision', 'resourceId', 'handleId', 'limitationCodes'];
+        const fields = ['receiptId', 'intentId', 'kind', 'outcome', 'generation', 'observedAt', 'observerId', 'evidenceHash', 'consumerId', 'revision', 'resourceId', 'handleId', 'accountId', 'parentResourceId', 'destinationId', 'storeVersion', 'reconcilesReceiptIds', 'limitationCodes'];
         if (Object.keys(receipt).some(k => !fields.includes(k)))
             throw new Error('Unexpected receipt payload');
         for (const key of ['receiptId', 'intentId', 'observerId', 'evidenceHash'] as const)
             metadataId(receipt[key]);
-        for (const v of [receipt.consumerId, receipt.revision, receipt.resourceId, receipt.handleId, ...receipt.limitationCodes])
+        for (const v of [receipt.consumerId, receipt.revision, receipt.resourceId, receipt.handleId, receipt.accountId, receipt.parentResourceId, receipt.destinationId, ...(receipt.reconcilesReceiptIds ?? []), ...receipt.limitationCodes])
             if (v !== undefined)
                 metadataId(v);
-        if (!['creation', 'validation', 'storage', 'delivery-accepted', 'direct-use', 'inferred-adoption', 'issuer-revocation', 'issuer-rejection', 'reconciliation', 'unknown'].includes(receipt.kind) || !['confirmed', 'rejected', 'unknown'].includes(receipt.outcome) || !Number.isSafeInteger(receipt.generation) || receipt.generation < 0 || !Number.isSafeInteger(receipt.observedAt) || receipt.observedAt < 0)
+        if (!['creation', 'validation', 'storage', 'delivery-accepted', 'direct-use', 'inferred-adoption', 'issuer-revocation', 'issuer-rejection', 'reconciliation', 'unknown', 'restart', 'quarantine', 'disable', 'sign-out', 'administration', 'containment'].includes(receipt.kind) || !['confirmed', 'rejected', 'unknown'].includes(receipt.outcome) || !Number.isSafeInteger(receipt.generation) || receipt.generation < 0 || !Number.isSafeInteger(receipt.observedAt) || receipt.observedAt < 0)
             throw new Error('Invalid receipt metadata');
+        if (receipt.storeVersion !== undefined && (!Number.isSafeInteger(receipt.storeVersion) || receipt.storeVersion < 1))
+            throw new Error('Invalid pinned store version');
+        if (receipt.reconcilesReceiptIds !== undefined && (!Array.isArray(receipt.reconcilesReceiptIds) || new Set(receipt.reconcilesReceiptIds).size !== receipt.reconcilesReceiptIds.length))
+            throw new Error('Invalid reconciliation receipt references');
         this.transaction(db => {
             db.prepare('INSERT INTO receipt VALUES(?,?,?)').run(receipt.receiptId, receipt.intentId, JSON.stringify(receipt));
-            db.prepare('UPDATE intent SET state=? WHERE intent_id=?').run(receipt.outcome === 'unknown' ? 'unknown' : 'observed', receipt.intentId);
             this.audit(db, 'receipt-appended', null, receipt.receiptId);
+        });
+    }
+    /** Evidence append never resolves an effect. Only a complete, signed-subject-bound set may do so. */
+    resolveIntent(input: {
+        intentId: string;
+        receiptIds: string[];
+        reconciliationReceiptId?: string;
+    }): void {
+        this.transaction(db => {
+            if (db.prepare('SELECT boot_id FROM controller WHERE singleton=1').get()?.boot_id !== this.bootId)
+                throw new Error('Controller boot fenced');
+            const intent = db.prepare('SELECT * FROM intent WHERE intent_id=?').get(input.intentId);
+            if (!intent || intent.state === 'observed')
+                throw new Error('Intent is missing or already resolved');
+            const op = db.prepare('SELECT * FROM operation WHERE operation_id=?').get(String(intent.operation_id));
+            const grant = db.prepare('SELECT raw_manifest FROM approval_grant WHERE grant_id=?').get(String(intent.grant_id));
+            if (!op || !grant)
+                throw new Error('Intent authority metadata missing');
+            const manifest = parseCanonicalManifest(String(grant.raw_manifest));
+            const operation = manifest.operations.find(o => o.operationId === intent.operation_id);
+            const action = operation?.actions.find(a => a.id === intent.action_id);
+            if (!operation || !action || action.kind !== intent.kind || canonicalJSON(action.parameters) !== String(intent.parameters))
+                throw new Error('Intent does not match signed action');
+            if (!input.receiptIds.length || new Set(input.receiptIds).size !== input.receiptIds.length)
+                throw new Error('Complete distinct evidence references required');
+            const history = db.prepare('SELECT rowid AS sequence,metadata FROM receipt WHERE intent_id=? ORDER BY rowid').all(input.intentId).map(row => ({ sequence: Number(row.sequence), receipt: JSON.parse(String(row.metadata)) as MetadataReceipt }));
+            const selected = input.receiptIds.map(id => {
+                const entry = history.find(h => h.receipt.receiptId === id);
+                if (!entry)
+                    throw new Error('Evidence belongs to another intent or is missing');
+                return entry.receipt;
+            });
+            const generation = Number(action.parameters.generation ?? operation.toGeneration);
+            const subject = (receipt: MetadataReceipt, expected: Record<string, string | number>) => {
+                if (receipt.outcome !== 'confirmed' || receipt.accountId !== operation.accountId || receipt.generation !== generation)
+                    throw new Error('Receipt outcome, account or generation mismatch');
+                for (const [key, value] of Object.entries(expected))
+                    if ((receipt as unknown as Record<string, unknown>)[key] !== value)
+                        throw new Error('Receipt subject mismatch: ' + key);
+            };
+            const requireKind = (kind: ReceiptKind, expected: Record<string, string | number>) => {
+                const candidates = selected.filter(r => r.kind === kind);
+                if (!candidates.length)
+                    throw new Error('Complete ' + kind + ' evidence required');
+                for (const receipt of candidates)
+                    subject(receipt, expected);
+                return candidates[0]!;
+            };
+            let expected: Record<string, string | number> = {};
+            let allowed: ReceiptKind[] = [];
+            if (action.kind === 'create') {
+                const created = requireKind('creation', { parentResourceId: String(action.parameters.resourceId) });
+                if (!created.resourceId || created.resourceId.startsWith('created:'))
+                    throw new Error('Concrete created issuer identity required');
+                expected = { resourceId: created.resourceId };
+                allowed = ['creation'];
+                for (const receipt of selected.filter(r => r.kind === 'creation'))
+                    subject(receipt, { ...expected, parentResourceId: String(action.parameters.resourceId) });
+                if (action.budgetCost.effects >= 2) {
+                    expected.handleId = String(action.parameters.handleId);
+                    expected.destinationId = String(action.parameters.destinationId);
+                    const stored = requireKind('storage', expected);
+                    if (!Number.isSafeInteger(stored.storeVersion) || Number(stored.storeVersion) < 1)
+                        throw new Error('Pinned storage version required');
+                    expected.storeVersion = stored.storeVersion!;
+                    allowed.push('storage');
+                    for (const receipt of selected.filter(r => r.kind === 'storage'))
+                        subject(receipt, expected);
+                }
+            }
+            else {
+                for (const [parameter, field] of [['resourceId', 'resourceId'], ['consumerId', 'consumerId'], ['handleId', 'handleId'], ['destinationId', 'destinationId'], ['expectedRevision', 'revision']] as const) {
+                    const value = action.parameters[parameter];
+                    if (value !== undefined)
+                        expected[field] = value;
+                }
+                if (typeof expected.resourceId === 'string' && expected.resourceId.startsWith('created:')) {
+                    if (expected.resourceId !== 'created:' + operation.operationId)
+                        throw new Error('Created reference belongs to another operation');
+                    const creations = db.prepare("SELECT r.metadata FROM receipt r JOIN intent i ON i.intent_id=r.intent_id WHERE i.operation_id=? AND i.kind='create' AND i.state='observed'").all(operation.operationId).map(row => JSON.parse(String(row.metadata)) as MetadataReceipt).filter(r => r.kind === 'creation' && r.outcome === 'confirmed' && r.accountId === operation.accountId && r.generation === generation);
+                    const ids = new Set(creations.map(r => r.resourceId).filter((id): id is string => Boolean(id)));
+                    if (ids.size !== 1)
+                        throw new Error('Created issuer reference is not durably resolved');
+                    expected.resourceId = [...ids][0]!;
+                }
+                const kinds: Record<string, ReceiptKind> = { validate: 'validation', store: 'storage', deliver: 'delivery-accepted', restart: 'restart', revoke: 'issuer-revocation', cleanup: 'issuer-revocation', quarantine: 'quarantine', disable: 'disable', 'sign-out': 'sign-out', admin: 'administration', 'emergency-contain': 'containment' };
+                const kind = kinds[action.kind];
+                if (!kind)
+                    throw new Error('Action resolution unsupported');
+                const receipt = requireKind(kind, expected);
+                allowed = [kind];
+                if (kind === 'storage') {
+                    if (!Number.isSafeInteger(receipt.storeVersion) || Number(receipt.storeVersion) < 1)
+                        throw new Error('Pinned storage version required');
+                    expected.storeVersion = receipt.storeVersion!;
+                    for (const stored of selected.filter(r => r.kind === 'storage'))
+                        subject(stored, expected);
+                }
+            }
+            if (selected.some(r => !allowed.includes(r.kind)))
+                throw new Error('Receipt kind does not resolve this action');
+            const unknowns = history.filter(h => h.receipt.outcome === 'unknown');
+            if (intent.state === 'unknown' || unknowns.length || input.reconciliationReceiptId) {
+                const marker = history.find(h => h.receipt.receiptId === input.reconciliationReceiptId);
+                if (!marker || marker.receipt.kind !== 'reconciliation' || !Array.isArray(marker.receipt.reconcilesReceiptIds))
+                    throw new Error('Explicit complete reconciliation required');
+                subject(marker.receipt, expected);
+                if (unknowns.some(h => !marker.receipt.reconcilesReceiptIds!.includes(h.receipt.receiptId) || h.sequence >= marker.sequence) || marker.receipt.reconcilesReceiptIds.some(id => !unknowns.some(h => h.receipt.receiptId === id)) || selected.some(r => r.observedAt > marker.receipt.observedAt || history.find(h => h.receipt.receiptId === r.receiptId)!.sequence >= marker.sequence))
+                    throw new Error('Reconciliation does not cover historical uncertainty');
+            }
+            db.prepare("UPDATE intent SET state='observed' WHERE intent_id=?").run(input.intentId);
+            this.audit(db, 'intent-explicitly-resolved', String(intent.operation_id), input.reconciliationReceiptId ?? input.receiptIds[0]!);
         });
     }
     listReceipts(operationId: string): MetadataReceipt[] {
