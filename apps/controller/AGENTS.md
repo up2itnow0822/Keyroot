@@ -19,4 +19,4 @@
 - Root typecheck, lint and build. Bootstrap health is a smoke check only.
 
 ## Child DOX Index
-- None. This contract owns controller source recursively.
+- `src/worker/AGENTS.md` — dashboard command/observation mediation and proof limits.
