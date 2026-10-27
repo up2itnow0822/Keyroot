@@ -17,6 +17,8 @@
 - Compound create/store reserves both effects, signs the store destination/handle and rechecks authority before CAS.
 - Current-snapshot digests, bootstrap capability, recovery observations and clock injection are trusted executor inputs, never owner JSON proof.
 - Installation epoch checks fence future dispatch but cannot cancel an upstream request or guarantee exactly-once execution.
+- Store adapters expose a mapped, pinned-version consumer port. Reconciliation requires stored operation/issuer/account binding; existence alone is insufficient.
+- Current issuer transport is synthetic only. Live admission, complete engine integration and actual OpenBao validation remain separate pending units.
 
 ## Work Guidance
 - Test public behavior and record proof-first evidence when practical.
